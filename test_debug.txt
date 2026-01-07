@@ -1,0 +1,38 @@
+PHPUnit 12.5.4 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.3.11
+Configuration: /home/redoy/Documents/Sample Project/laravel/packages/redoy/authmaster/phpunit.xml
+
+E....                                                               5 / 5 (100%)
+
+Time: 00:00.730, Memory: 46.50 MB
+
+There was 1 error:
+
+1) Redoy\AuthMaster\Tests\Feature\Auth\SecurityFeaturesTest::test_device_based_login_lockout
+Illuminate\Database\QueryException: SQLSTATE[23000]: Integrity constraint violation: 19 NOT NULL constraint failed: authmaster_login_attempts.ip_address (Connection: testing, SQL: insert into "authmaster_login_attempts" ("device_id", "attempts", "last_attempt_at", "created_at", "updated_at") values (device_xyz, 1, 2026-01-07 13:25:32, 2026-01-07 13:25:32, 2026-01-07 13:25:32))
+
+/home/redoy/Documents/Sample Project/laravel/packages/redoy/authmaster/vendor/laravel/framework/src/Illuminate/Database/Connection.php:826
+/home/redoy/Documents/Sample Project/laravel/packages/redoy/authmaster/vendor/laravel/framework/src/Illuminate/Database/Connection.php:780
+/home/redoy/Documents/Sample Project/laravel/packages/redoy/authmaster/vendor/laravel/framework/src/Illuminate/Database/Connection.php:559
+/home/redoy/Documents/Sample Project/laravel/packages/redoy/authmaster/vendor/laravel/framework/src/Illuminate/Database/Connection.php:523
+/home/redoy/Documents/Sample Project/laravel/packages/redoy/authmaster/vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3804
+/home/redoy/Documents/Sample Project/laravel/packages/redoy/authmaster/src/Services/SecurityService.php:112
+/home/redoy/Documents/Sample Project/laravel/packages/redoy/authmaster/src/Services/SecurityService.php:73
+/home/redoy/Documents/Sample Project/laravel/packages/redoy/authmaster/tests/Feature/Auth/SecurityFeaturesTest.php:99
+
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 19 NOT NULL constraint failed: authmaster_login_attempts.ip_address
+
+/home/redoy/Documents/Sample Project/laravel/packages/redoy/authmaster/vendor/laravel/framework/src/Illuminate/Database/Connection.php:570
+/home/redoy/Documents/Sample Project/laravel/packages/redoy/authmaster/vendor/laravel/framework/src/Illuminate/Database/Connection.php:813
+/home/redoy/Documents/Sample Project/laravel/packages/redoy/authmaster/vendor/laravel/framework/src/Illuminate/Database/Connection.php:780
+/home/redoy/Documents/Sample Project/laravel/packages/redoy/authmaster/vendor/laravel/framework/src/Illuminate/Database/Connection.php:559
+/home/redoy/Documents/Sample Project/laravel/packages/redoy/authmaster/vendor/laravel/framework/src/Illuminate/Database/Connection.php:523
+/home/redoy/Documents/Sample Project/laravel/packages/redoy/authmaster/vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3804
+/home/redoy/Documents/Sample Project/laravel/packages/redoy/authmaster/src/Services/SecurityService.php:112
+/home/redoy/Documents/Sample Project/laravel/packages/redoy/authmaster/src/Services/SecurityService.php:73
+/home/redoy/Documents/Sample Project/laravel/packages/redoy/authmaster/tests/Feature/Auth/SecurityFeaturesTest.php:99
+
+ERRORS!
+Tests: 5, Assertions: 13, Errors: 1.

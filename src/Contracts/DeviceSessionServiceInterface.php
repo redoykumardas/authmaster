@@ -34,6 +34,8 @@ interface DeviceSessionServiceInterface
      * @param mixed $tokenId Optional token ID
      * @param array $tokenData Token metadata
      * @param string|null $deviceName Optional device name
+     * @param string|null $ipAddress Optional IP address
+     * @param string|null $userAgent Optional user agent
      * @return object The session object
      */
     public function createOrUpdateSessionFromData(
@@ -41,7 +43,9 @@ interface DeviceSessionServiceInterface
         string $deviceId,
         $tokenId = null,
         array $tokenData = [],
-        ?string $deviceName = null
+        ?string $deviceName = null,
+        ?string $ipAddress = null,
+        ?string $userAgent = null
     );
 
     /**

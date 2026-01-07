@@ -49,9 +49,11 @@ interface AuthManagerInterface
      * @param mixed $user The authenticated user
      * @param string $deviceId The device identifier
      * @param string|null $deviceName Optional device name
+     * @param string|null $ipAddress Optional IP address
+     * @param string|null $userAgent Optional user agent
      * @return AuthResult Result with token data
      */
-    public function finalizeLoginFromData($user, string $deviceId, ?string $deviceName = null): AuthResult;
+    public function finalizeLoginFromData($user, string $deviceId, ?string $deviceName = null, ?string $ipAddress = null, ?string $userAgent = null): AuthResult;
 
     /**
      * Register a new user.

@@ -10,7 +10,7 @@ return new class extends Migration {
         Schema::create('authmaster_login_attempts', function (Blueprint $col) {
             $col->id();
             $col->string('email')->nullable()->index();
-            $col->string('ip_address', 45)->index();
+            $col->string('ip_address', 45)->nullable()->index();
             $col->integer('attempts')->default(1);
             $col->timestamp('last_attempt_at')->useCurrent();
             $col->timestamps();

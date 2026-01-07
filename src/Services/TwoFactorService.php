@@ -3,10 +3,9 @@
 namespace Redoy\AuthMaster\Services;
 
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Mail;
 use Redoy\AuthMaster\Contracts\OtpGeneratorInterface;
 use Redoy\AuthMaster\Contracts\TwoFactorServiceInterface;
-use Redoy\AuthMaster\Mail\SendOtpMail;
+use Redoy\AuthMaster\Jobs\SendOtpJob;
 
 class TwoFactorService implements TwoFactorServiceInterface
 {
@@ -20,8 +19,37 @@ class TwoFactorService implements TwoFactorServiceInterface
         return "authmaster_otp:{$userId}:{$deviceId}";
     }
 
+    protected function resendCooldownKey($userId): string
+    {
+        return "authmaster_2fa_resend_cooldown:{$userId}";
+    }
+
+    protected function checkResendDelay($userId): ?int
+    {
+        $key = $this->resendCooldownKey($userId);
+        $expiresAt = Cache::get($key);
+
+        if ($expiresAt && now()->timestamp < $expiresAt) {
+            return $expiresAt - now()->timestamp;
+        }
+
+        return null;
+    }
+
+    protected function setResendDelay($userId): void
+    {
+        $delay = config('authmaster.otp.resend_delay_seconds', 60);
+        $key = $this->resendCooldownKey($userId);
+        Cache::put($key, now()->timestamp + $delay, $delay);
+    }
+
     public function generateAndSend($user, ?string $deviceId = null): array
     {
+        $delay = $this->checkResendDelay($user->id);
+        if ($delay) {
+            return ['success' => false, 'message' => "Please wait {$delay} seconds before requesting a new OTP"];
+        }
+
         $length = config('authmaster.otp.length', 6);
         $ttl = config('authmaster.otp.ttl', 300);
 
@@ -30,13 +58,15 @@ class TwoFactorService implements TwoFactorServiceInterface
 
         $key = $this->cacheKey($user->id, $device);
         Cache::put($key, $code, $ttl);
+        $this->setResendDelay($user->id);
 
-        try {
-            Mail::to($user->email)->send(new SendOtpMail($user, $code));
-            return ['success' => true];
-        } catch (\Throwable $e) {
-            return ['success' => false, 'message' => 'Failed to send OTP'];
+        if (config('authmaster.otp.use_queue', true)) {
+            SendOtpJob::dispatch($user, $code);
+        } else {
+            (new SendOtpJob($user, $code))->handle();
         }
+
+        return ['success' => true];
     }
 
     public function verify($user, string $code, ?string $deviceId = null): array
@@ -63,12 +93,10 @@ class TwoFactorService implements TwoFactorServiceInterface
             return false;
         }
 
-        // If forced globally
         if (config('authmaster.otp.force_for_all', false)) {
             return true;
         }
 
-        // If user has a flag
         if (isset($user->two_factor_enabled)) {
             return (bool) $user->two_factor_enabled;
         }

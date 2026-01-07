@@ -38,11 +38,15 @@ class AuthManager implements AuthManagerInterface
 
     public function extractDeviceId(Request $request): string
     {
-        if ($request->header('device_id')) {
-            return (string) $request->header('device_id');
+        $deviceId = $request->header('device_id')
+            ?? $request->header('X-Device-Id')
+            ?? $request->header('Device-Id');
+
+        if ($deviceId) {
+            return (string) $deviceId;
         }
 
-        return hash('sha256', $request->ip() . '|' . $request->userAgent());
+        return hash('sha256', (string) $request->ip() . '|' . (string) $request->userAgent());
     }
 
     public function login(Request $request): AuthResult
@@ -51,12 +55,12 @@ class AuthManager implements AuthManagerInterface
         $deviceId = $this->extractDeviceId($request);
 
         // Security checks: rate limit, lockout
-        if (!$this->securityService->allowLoginAttempt($credentials['email'] ?? null, $request->ip())) {
+        if (!$this->securityService->allowLoginAttempt($credentials['email'] ?? null, $request->ip(), $deviceId)) {
             throw new TooManyAttemptsException();
         }
 
         if (!Auth::attempt($credentials)) {
-            $this->securityService->recordFailedAttempt($credentials['email'] ?? null, $request->ip());
+            $this->securityService->recordFailedAttempt($credentials['email'] ?? null, $request->ip(), $deviceId);
             throw new InvalidCredentialsException();
         }
 
@@ -76,12 +80,12 @@ class AuthManager implements AuthManagerInterface
 
     public function loginWithData(LoginData $data): AuthResult
     {
-        if (!$this->securityService->allowLoginAttempt($data->email, $data->ipAddress)) {
+        if (!$this->securityService->allowLoginAttempt($data->email, $data->ipAddress, $data->deviceId)) {
             throw new TooManyAttemptsException();
         }
 
         if (!Auth::attempt(['email' => $data->email, 'password' => $data->password])) {
-            $this->securityService->recordFailedAttempt($data->email, $data->ipAddress);
+            $this->securityService->recordFailedAttempt($data->email, $data->ipAddress, $data->deviceId);
             throw new InvalidCredentialsException();
         }
 
@@ -94,7 +98,13 @@ class AuthManager implements AuthManagerInterface
 
         $this->securityService->clearFailedAttempts($user->email);
 
-        return $this->finalizeLoginFromData($user, $data->deviceId, $data->deviceName);
+        return $this->finalizeLoginFromData(
+            $user,
+            $data->deviceId,
+            $data->deviceName,
+            $data->ipAddress,
+            $data->userAgent
+        );
     }
 
     /**
@@ -118,11 +128,19 @@ class AuthManager implements AuthManagerInterface
     /**
      * Finalize login using device data directly (for DTO-based flows).
      */
-    public function finalizeLoginFromData($user, string $deviceId, ?string $deviceName = null): AuthResult
+    public function finalizeLoginFromData($user, string $deviceId, ?string $deviceName = null, ?string $ipAddress = null, ?string $userAgent = null): AuthResult
     {
         $tokenData = $this->tokenService->createTokenForUser($user, $deviceId);
 
-        $this->deviceService->createOrUpdateSessionFromData($user, $deviceId, $tokenData['token_id'] ?? null, $tokenData, $deviceName);
+        $this->deviceService->createOrUpdateSessionFromData(
+            $user,
+            $deviceId,
+            $tokenData['token_id'] ?? null,
+            $tokenData,
+            $deviceName,
+            $ipAddress,
+            $userAgent
+        );
 
         $this->deviceService->enforceDeviceLimit($user);
 
@@ -130,7 +148,7 @@ class AuthManager implements AuthManagerInterface
             user: $user,
             token: $tokenData,
             message: 'Logged in'
-        ))->tap(fn($res) => event(new LoginSuccessful($user, $deviceId)));
+        ))->tap(fn($res) => event(new LoginSuccessful($user, $deviceId, $ipAddress)));
     }
 
     public function register(Request $request): AuthResult
@@ -158,6 +176,7 @@ class AuthManager implements AuthManagerInterface
         $user = $request->user();
         if ($user) {
             $this->deviceService->invalidateSession($user, $deviceId);
+            $this->securityService->clearFailedAttempts($user->email, $deviceId);
             event(new LogoutSuccessful($user, $deviceId));
         }
     }

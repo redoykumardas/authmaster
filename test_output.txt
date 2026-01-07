@@ -1,0 +1,11 @@
+PHPUnit 12.5.4 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.3.11
+Configuration: /home/redoy/Documents/Sample Project/laravel/packages/redoy/authmaster/phpunit.xml
+
+NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN              52 / 52 (100%)
+
+Time: 00:03.098, Memory: 50.50 MB
+
+OK, but there were issues!
+Tests: 52, Assertions: 122, PHPUnit Notices: 52.

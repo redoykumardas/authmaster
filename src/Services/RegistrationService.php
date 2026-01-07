@@ -7,22 +7,32 @@ use Illuminate\Support\Facades\Hash;
 use Redoy\AuthMaster\Contracts\AuthManagerInterface;
 use Redoy\AuthMaster\Contracts\EmailVerificationServiceInterface;
 use Redoy\AuthMaster\Contracts\RegistrationServiceInterface;
+use Redoy\AuthMaster\Contracts\SecurityServiceInterface;
 use Redoy\AuthMaster\DTOs\AuthResult;
 use Redoy\AuthMaster\DTOs\RegisterData;
 use Redoy\AuthMaster\DTOs\VerifyEmailData;
 use Redoy\AuthMaster\Exceptions\AuthException;
+use Redoy\AuthMaster\Exceptions\TooManyAttemptsException;
 use Redoy\AuthMaster\Exceptions\VerificationFailedException;
 
 class RegistrationService implements RegistrationServiceInterface
 {
     public function __construct(
         protected AuthManagerInterface $authManager,
-        protected EmailVerificationServiceInterface $emailVerification
+        protected EmailVerificationServiceInterface $emailVerification,
+        protected SecurityServiceInterface $securityService
     ) {
     }
 
     public function register(RegisterData $data): AuthResult
     {
+        // Enforce device-based registration limit
+        if (!$this->securityService->allowRegistrationAttempt($data->ipAddress, $data->deviceId)) {
+            throw new TooManyAttemptsException('Too many registration attempts from this device. Please try again later.');
+        }
+
+        $this->securityService->recordRegistrationAttempt($data->ipAddress, $data->deviceId);
+
         // Check if pending registration flow is enabled
         if ($this->emailVerification->isPendingFlowEnabled()) {
             return $this->handlePendingRegistration($data);
@@ -40,6 +50,8 @@ class RegistrationService implements RegistrationServiceInterface
             'password' => Hash::make($data->password),
             'device_id' => $data->deviceId,
             'device_name' => $data->deviceName,
+            'ip_address' => $data->ipAddress,
+            'user_agent' => $data->userAgent,
         ]);
 
         if (!$result['success']) {
@@ -73,7 +85,13 @@ class RegistrationService implements RegistrationServiceInterface
         if ($this->emailVerification->isVerificationRequired()) {
             $this->emailVerification->sendVerification($user);
 
-            $tokenResult = $this->authManager->finalizeLoginFromData($user, $data->deviceId, $data->deviceName);
+            $tokenResult = $this->authManager->finalizeLoginFromData(
+                $user,
+                $data->deviceId,
+                $data->deviceName,
+                $data->ipAddress,
+                $data->userAgent
+            );
 
             return new AuthResult(
                 user: $user,
@@ -85,7 +103,13 @@ class RegistrationService implements RegistrationServiceInterface
             );
         }
 
-        $tokenResult = $this->authManager->finalizeLoginFromData($user, $data->deviceId, $data->deviceName);
+        $tokenResult = $this->authManager->finalizeLoginFromData(
+            $user,
+            $data->deviceId,
+            $data->deviceName,
+            $data->ipAddress,
+            $data->userAgent
+        );
 
         return new AuthResult(
             user: $user,
@@ -121,7 +145,9 @@ class RegistrationService implements RegistrationServiceInterface
                 $tokenResult = $this->authManager->finalizeLoginFromData(
                     $user,
                     $result['device_id'] ?? $data->deviceId,
-                    $result['device_name'] ?? $data->deviceName
+                    $result['device_name'] ?? $data->deviceName,
+                    $result['ip_address'] ?? $data->ipAddress,
+                    $result['user_agent'] ?? $data->userAgent
                 );
 
                 return new AuthResult(
@@ -170,7 +196,9 @@ class RegistrationService implements RegistrationServiceInterface
                 $tokenResult = $this->authManager->finalizeLoginFromData(
                     $user,
                     $result['device_id'] ?? $data->deviceId,
-                    $result['device_name'] ?? $data->deviceName
+                    $result['device_name'] ?? $data->deviceName,
+                    $result['ip_address'] ?? $data->ipAddress,
+                    $result['user_agent'] ?? $data->userAgent
                 );
 
                 return new AuthResult(
@@ -195,7 +223,7 @@ class RegistrationService implements RegistrationServiceInterface
         );
     }
 
-    public function resendVerification($user): void
+    public function resendVerification($user): AuthResult
     {
         if ($this->emailVerification->isVerified($user)) {
             throw new AuthException('Email already verified', 400);
@@ -206,5 +234,7 @@ class RegistrationService implements RegistrationServiceInterface
         if (!$result['success']) {
             throw new AuthException($result['message'] ?? 'Failed to send verification', 422);
         }
+
+        return new AuthResult(message: $result['message'] ?? 'Verification sent');
     }
 }

@@ -163,6 +163,7 @@ class AuthMasterServiceProvider extends ServiceProvider
             if (method_exists($router, 'aliasMiddleware')) {
                 $router->aliasMiddleware('authmaster.attach_device', Http\Middleware\AttachDeviceId::class);
                 $router->aliasMiddleware('authmaster.verified', Http\Middleware\EnsureEmailIsVerified::class);
+                $router->aliasMiddleware('authmaster.track_device', Http\Middleware\TrackDeviceActivity::class);
             }
         }
     }

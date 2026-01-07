@@ -13,7 +13,10 @@ return [
 
     'security' => [
         'max_login_attempts' => env('AUTHMASTER_MAX_LOGIN_ATTEMPTS', 5),
+        'max_login_attempts_per_device' => env('AUTHMASTER_MAX_LOGIN_ATTEMPTS_PER_DEVICE', 10),
+        'max_registration_attempts_per_device' => env('AUTHMASTER_MAX_REG_ATTEMPTS_PER_DEVICE', 3),
         'lockout_duration_minutes' => env('AUTHMASTER_LOCKOUT_DURATION', 15),
+        'device_lockout_duration_minutes' => env('AUTHMASTER_DEVICE_LOCKOUT_DURATION', 60),
         'otp_enforcement_threshold' => env('AUTHMASTER_OTP_ENFORCE_THRESHOLD', 3),
         'notify_on_suspicious' => env('AUTHMASTER_NOTIFY_SUSPICIOUS', true),
     ],
@@ -37,6 +40,10 @@ return [
         'length' => env('AUTHMASTER_OTP_LENGTH', 6),
         'ttl' => env('AUTHMASTER_OTP_TTL', 300), // seconds
         'force_for_all' => env('AUTHMASTER_OTP_FORCE_FOR_ALL', false),
+        'resend_delay_seconds' => env('AUTHMASTER_OTP_RESEND_DELAY', 60),
+
+        'use_queue' => env('AUTHMASTER_OTP_USE_QUEUE', true),
+        'queue_name' => env('AUTHMASTER_OTP_QUEUE', 'default'),
 
         // Default OTP for development/testing (only used when APP_ENV != 'production')
         // Set to null to always use random OTP

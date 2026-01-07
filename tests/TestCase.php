@@ -29,13 +29,31 @@ abstract class TestCase extends OrchestraTestCase
         $app['config']->set('authmaster.auth_middleware', 'api');
         // Use array cache driver for predictable in-memory cache behavior in tests
         $app['config']->set('cache.default', 'array');
+
+        $app['config']->set('auth.providers.users.model', \Illuminate\Foundation\Auth\User::class);
+    }
+
+    protected function defineDatabaseMigrations()
+    {
+        try {
+            $this->loadLaravelMigrations();
+        } catch (\Throwable $e) {
+            // Fallback: manually create users table for tests
+            \Illuminate\Support\Facades\Schema::create('users', function ($table) {
+                $table->id();
+                $table->string('name');
+                $table->string('email')->unique();
+                $table->string('password');
+                $table->timestamp('email_verified_at')->nullable();
+                $table->rememberToken();
+                $table->timestamps();
+            });
+        }
+        $this->loadMigrationsFrom(__DIR__ . '/../src/database/migrations');
     }
 
     protected function setUp(): void
     {
         parent::setUp();
-
-        // Load default Laravel migrations (creates users table)
-        $this->loadLaravelMigrations();
     }
 }

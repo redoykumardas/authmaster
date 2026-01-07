@@ -30,8 +30,8 @@ interface RegistrationServiceInterface
      * Resend verification to user.
      *
      * @param mixed $user The user instance
-     * @return void
+     * @return AuthResult
      * @throws \Redoy\AuthMaster\Exceptions\AuthException On failure
      */
-    public function resendVerification($user): void;
+    public function resendVerification($user): AuthResult;
 }

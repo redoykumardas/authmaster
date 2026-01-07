@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Redoy\AuthMaster\Contracts\DeviceSessionServiceInterface;
 use Redoy\AuthMaster\Models\DeviceSession;
+use Redoy\AuthMaster\Support\DeviceDetector;
 
 class DeviceSessionService implements DeviceSessionServiceInterface
 {
@@ -22,7 +23,7 @@ class DeviceSessionService implements DeviceSessionServiceInterface
         );
     }
 
-    public function createOrUpdateSessionFromData($user, string $deviceId, $tokenId = null, array $tokenData = [], ?string $deviceName = null)
+    public function createOrUpdateSessionFromData($user, string $deviceId, $tokenId = null, array $tokenData = [], ?string $deviceName = null, ?string $ipAddress = null, ?string $userAgent = null)
     {
         return $this->storeSession(
             $user,
@@ -30,8 +31,8 @@ class DeviceSessionService implements DeviceSessionServiceInterface
             $tokenId,
             $tokenData,
             $deviceName,
-            null,
-            null
+            $ipAddress,
+            $userAgent
         );
     }
 
@@ -43,6 +44,9 @@ class DeviceSessionService implements DeviceSessionServiceInterface
                 'device_name' => $deviceName,
                 'ip_address' => $ipAddress,
                 'user_agent' => $userAgent,
+                'browser' => $userAgent ? DeviceDetector::detect($userAgent)['browser'] : null,
+                'os' => $userAgent ? DeviceDetector::detect($userAgent)['os'] : null,
+                'device_type' => $userAgent ? DeviceDetector::detect($userAgent)['device_type'] : null,
                 'last_active_at' => Carbon::now(),
                 'token_id' => $tokenId,
                 'meta' => ['token' => $tokenData],
