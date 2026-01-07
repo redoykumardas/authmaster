@@ -16,11 +16,14 @@ Route::group(['prefix' => 'auth', 'middleware' => ['api']], function () {
 
     // 2FA endpoints can be used in both flows; keep public for login flow and protected via token for user flow
     Route::post('2fa/verify', [AuthController::class, 'verify2fa']);
+
+    // Email verification (link-based can be public, OTP needs auth)
+    Route::post('verify-email', [AuthController::class, 'verifyEmail']);
+    Route::get('verify-email', [AuthController::class, 'verifyEmail']);
 });
 
-// Protected routes
 $authMiddleware = config('authmaster.auth_middleware', 'auth:sanctum');
-Route::group(['prefix' => 'auth', 'middleware' => ['api', $authMiddleware]], function () {
+Route::group(['prefix' => 'auth', 'middleware' => ['api', $authMiddleware, 'authmaster.verified']], function () {
     Route::post('logout', [AuthController::class, 'logout']);
     Route::post('logout/all', [AuthController::class, 'logoutAll']);
     Route::get('profile', [AuthController::class, 'profile']);
@@ -29,4 +32,11 @@ Route::group(['prefix' => 'auth', 'middleware' => ['api', $authMiddleware]], fun
     Route::post('password/change', [AuthController::class, 'changePassword']);
 
     Route::post('2fa/send', [AuthController::class, 'send2fa']);
+
+    // Resend email verification (requires auth but NOT verified email - moved below)
+});
+
+// Routes that need auth but NOT email verification
+Route::group(['prefix' => 'auth', 'middleware' => ['api', $authMiddleware]], function () {
+    Route::post('resend-verification', [AuthController::class, 'resendVerification']);
 });

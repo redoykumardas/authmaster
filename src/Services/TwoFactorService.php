@@ -4,25 +4,20 @@ namespace Redoy\AuthMaster\Services;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
+use Redoy\AuthMaster\Contracts\OtpGeneratorInterface;
+use Redoy\AuthMaster\Contracts\TwoFactorServiceInterface;
 use Redoy\AuthMaster\Mail\SendOtpMail;
 
-class TwoFactorService
+class TwoFactorService implements TwoFactorServiceInterface
 {
-    protected function cacheKey($userId, string $deviceId = 'global')
-    {
-        return "authmaster_otp:{$userId}:{$deviceId}";
+    public function __construct(
+        protected OtpGeneratorInterface $otpGenerator
+    ) {
     }
 
-    protected function generateNumericCode(int $length = 6): string
+    protected function cacheKey($userId, string $deviceId = 'global'): string
     {
-        $min = (int) str_repeat('0', $length);
-        $max = (int) str_repeat('9', $length);
-        $code = '';
-        for ($i = 0; $i < $length; $i++) {
-            $code .= (string) random_int(0, 9);
-        }
-        return $code;
+        return "authmaster_otp:{$userId}:{$deviceId}";
     }
 
     public function generateAndSend($user, ?string $deviceId = null): array
@@ -31,7 +26,7 @@ class TwoFactorService
         $ttl = config('authmaster.otp.ttl', 300);
 
         $device = $deviceId ?? 'global';
-        $code = $this->generateNumericCode($length);
+        $code = $this->otpGenerator->generate($length);
 
         $key = $this->cacheKey($user->id, $device);
         Cache::put($key, $code, $ttl);

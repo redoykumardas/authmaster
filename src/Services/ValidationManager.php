@@ -2,7 +2,9 @@
 
 namespace Redoy\AuthMaster\Services;
 
-class ValidationManager
+use Redoy\AuthMaster\Contracts\ValidationManagerInterface;
+
+class ValidationManager implements ValidationManagerInterface
 {
     public function rulesForLogin(): array
     {
@@ -20,6 +22,7 @@ class ValidationManager
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|confirmed|min:8',
             'device_id' => 'sometimes|string',
+            'device_name' => 'sometimes|string|max:255',
         ];
     }
 

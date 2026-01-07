@@ -1,9 +1,9 @@
 <?php return array(
     'root' => array(
         'name' => 'redoy/authmaster',
-        'pretty_version' => '1.0.0+no-version-set',
-        'version' => '1.0.0.0',
-        'reference' => null,
+        'pretty_version' => 'dev-main',
+        'version' => 'dev-main',
+        'reference' => '5a5e0ecf41a410abd375188d5dd767a508d16ec9',
         'type' => 'library',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -885,9 +885,9 @@
             'dev_requirement' => false,
         ),
         'redoy/authmaster' => array(
-            'pretty_version' => '1.0.0+no-version-set',
-            'version' => '1.0.0.0',
-            'reference' => null,
+            'pretty_version' => 'dev-main',
+            'version' => 'dev-main',
+            'reference' => '5a5e0ecf41a410abd375188d5dd767a508d16ec9',
             'type' => 'library',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

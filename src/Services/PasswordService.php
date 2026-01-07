@@ -2,11 +2,12 @@
 
 namespace Redoy\AuthMaster\Services;
 
-use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
+use Redoy\AuthMaster\Contracts\PasswordServiceInterface;
 
-class PasswordService
+class PasswordService implements PasswordServiceInterface
 {
     public function sendResetLink(string $email): array
     {

@@ -5,15 +5,42 @@ namespace Redoy\AuthMaster\Services;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Redoy\AuthMaster\Contracts\DeviceSessionServiceInterface;
 
-class DeviceSessionService
+class DeviceSessionService implements DeviceSessionServiceInterface
 {
     protected function userCacheKey($userId): string
     {
         return "authmaster:device_sessions:{$userId}";
     }
 
-    public function createOrUpdateSession($user, string $deviceId, Request $request, $tokenId = null, array $tokenData = [])
+    public function createOrUpdateSession($user, string $deviceId, Request $request, $tokenId = null, array $tokenData = [], string $deviceName = null)
+    {
+        return $this->storeSession(
+            $user,
+            $deviceId,
+            $tokenId,
+            $tokenData,
+            $deviceName,
+            $request->ip(),
+            $request->userAgent()
+        );
+    }
+
+    public function createOrUpdateSessionFromData($user, string $deviceId, $tokenId = null, array $tokenData = [], ?string $deviceName = null)
+    {
+        return $this->storeSession(
+            $user,
+            $deviceId,
+            $tokenId,
+            $tokenData,
+            $deviceName,
+            null,
+            null
+        );
+    }
+
+    protected function storeSession($user, string $deviceId, $tokenId, array $tokenData, ?string $deviceName, ?string $ipAddress, ?string $userAgent)
     {
         $key = $this->userCacheKey($user->id);
         $sessions = Cache::get($key, []);
@@ -25,8 +52,9 @@ class DeviceSessionService
         $sessions[$deviceId] = [
             'user_id' => $user->id,
             'device_id' => $deviceId,
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
+            'device_name' => $deviceName,
+            'ip_address' => $ipAddress,
+            'user_agent' => $userAgent,
             'last_active_at' => Carbon::now()->toDateTimeString(),
             'token_id' => $tokenId,
             'meta' => $meta,

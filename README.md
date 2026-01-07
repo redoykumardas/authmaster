@@ -100,6 +100,7 @@ $tokenResponse = authmaster_token_response(['access_token' => 'abc', 'expires_at
 The package exposes services bound in the container (see `AuthMasterServiceProvider`):
 
 - `Redoy\AuthMaster\Services\AuthManager` — high-level auth orchestration (login, register, 2FA, social, password flows).
+- `Redoy\AuthMaster\Services\EmailVerificationService` — handles OTP and Link-based verification flows (including secure pending registration).
 - `Redoy\AuthMaster\Services\TokenService` — token creation logic (supports Sanctum/Passport if present, otherwise fallback token generation).
 - `Redoy\AuthMaster\Services\DeviceSessionService` — manage per-user device sessions in cache.
 - `Redoy\AuthMaster\Services\TwoFactorService` — generate/verify OTPs and send via mail.
@@ -118,7 +119,9 @@ Notes:
 
 **Configuration**
 
-Defaults are in `src/config/authmaster.php` (published to `config/authmaster.php` when you publish). Important keys include:
+Defaults are in `src/config/authmaster.php` (published to `config/authmaster.php`). For detailed registration flows, see [Registration Guide](docs/REGISTRATION.md).
+
+Important keys include:
 
 - `driver` — token driver (sanctum, passport, etc.)
 - `auth_middleware` — guard middleware used for protected routes (defaults to `auth:sanctum` in the package). For quick integration you can set `authmaster.auth_middleware` to `api` or another guard in `config/authmaster.php`.

@@ -3,10 +3,11 @@
 namespace Redoy\AuthMaster\Services;
 
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Redoy\AuthMaster\Contracts\SecurityServiceInterface;
 
-class SecurityService
+class SecurityService implements SecurityServiceInterface
 {
     protected function attemptsKey(?string $email, string $ip)
     {

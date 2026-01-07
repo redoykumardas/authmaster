@@ -2,10 +2,10 @@
 
 namespace Redoy\AuthMaster\Tests\Unit;
 
+use Redoy\AuthMaster\Contracts\TwoFactorServiceInterface;
 use Redoy\AuthMaster\Tests\TestCase;
-use Redoy\AuthMaster\Services\TwoFactorService;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Mail;
 
 class TwoFactorServiceTest extends TestCase
 {
@@ -13,7 +13,7 @@ class TwoFactorServiceTest extends TestCase
     {
         Mail::fake();
 
-        $svc = new TwoFactorService();
+        $svc = $this->app->make(TwoFactorServiceInterface::class);
         $user = new \stdClass();
         $user->id = 10;
         $user->email = 'user@example.com';
@@ -22,7 +22,8 @@ class TwoFactorServiceTest extends TestCase
 
         $this->assertTrue($res['success']);
 
-        $key = (new \ReflectionClass($svc))->getMethod('cacheKey')->invoke($svc, $user->id, 'device-x');
+        // Verify code was cached
+        $key = "authmaster_otp:{$user->id}:device-x";
         $this->assertNotNull(Cache::get($key));
 
         Mail::assertSent(\Redoy\AuthMaster\Mail\SendOtpMail::class);
@@ -30,11 +31,11 @@ class TwoFactorServiceTest extends TestCase
 
     public function test_verify_success_and_failure_and_expiry()
     {
-        $svc = new TwoFactorService();
+        $svc = $this->app->make(TwoFactorServiceInterface::class);
         $user = new \stdClass();
         $user->id = 11;
 
-        $key = (new \ReflectionClass($svc))->getMethod('cacheKey')->invoke($svc, $user->id, 'global');
+        $key = "authmaster_otp:{$user->id}:global";
 
         // No code in cache => expiry
         $res = $svc->verify($user, '000000');
@@ -55,7 +56,7 @@ class TwoFactorServiceTest extends TestCase
 
     public function test_is_two_factor_required_for_various_flags()
     {
-        $svc = new TwoFactorService();
+        $svc = $this->app->make(TwoFactorServiceInterface::class);
         $user = new \stdClass();
         $user->id = 1;
 

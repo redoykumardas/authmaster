@@ -3,37 +3,37 @@
 namespace Redoy\AuthMaster\Services;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Redoy\AuthMaster\Models\DeviceSession;
+use Redoy\AuthMaster\Contracts\AuthManagerInterface;
+use Redoy\AuthMaster\Contracts\DeviceSessionServiceInterface;
+use Redoy\AuthMaster\Contracts\PasswordServiceInterface;
+use Redoy\AuthMaster\Contracts\SecurityServiceInterface;
+use Redoy\AuthMaster\Contracts\SocialLoginServiceInterface;
+use Redoy\AuthMaster\Contracts\TokenServiceInterface;
+use Redoy\AuthMaster\Contracts\TwoFactorServiceInterface;
+use Redoy\AuthMaster\Contracts\ValidationManagerInterface;
+use Redoy\AuthMaster\DTOs\LoginData;
+use Redoy\AuthMaster\DTOs\PasswordResetData;
+use Redoy\AuthMaster\Exceptions\InvalidCredentialsException;
+use Redoy\AuthMaster\Exceptions\TooManyAttemptsException;
+use Redoy\AuthMaster\Exceptions\TwoFactorRequiredException;
 
-class AuthManager
+class AuthManager implements AuthManagerInterface
 {
-    protected ValidationManager $validator;
-    protected TokenService $tokenService;
-    protected DeviceSessionService $deviceService;
-    protected PasswordService $passwordService;
-    protected TwoFactorService $twoFactorService;
-    protected SecurityService $securityService;
-
     public function __construct(
-        ValidationManager $validator,
-        TokenService $tokenService,
-        DeviceSessionService $deviceService,
-        PasswordService $passwordService,
-        TwoFactorService $twoFactorService,
-        SecurityService $securityService
+        protected ValidationManagerInterface $validator,
+        protected TokenServiceInterface $tokenService,
+        protected DeviceSessionServiceInterface $deviceService,
+        protected PasswordServiceInterface $passwordService,
+        protected TwoFactorServiceInterface $twoFactorService,
+        protected SecurityServiceInterface $securityService,
+        protected SocialLoginServiceInterface $socialLoginService
     ) {
-        $this->validator = $validator;
-        $this->tokenService = $tokenService;
-        $this->deviceService = $deviceService;
-        $this->passwordService = $passwordService;
-        $this->twoFactorService = $twoFactorService;
-        $this->securityService = $securityService;
     }
 
-    protected function extractDeviceId(Request $request): string
+    public function extractDeviceId(Request $request): string
     {
         if ($request->header('device_id')) {
             return (string) $request->header('device_id');
@@ -66,24 +66,68 @@ class AuthManager
             return ['success' => false, 'message' => '2fa_required'];
         }
 
-        // create token
-        $tokenData = $this->tokenService->createTokenForUser($user, $deviceId);
+        $this->securityService->clearFailedAttempts($user->email);
 
-        // store device session
-        $session = $this->deviceService->createOrUpdateSession($user, $deviceId, $request, $tokenData['token_id'] ?? null, $tokenData);
+        return $this->finalizeLogin($user, $request, $deviceId, $request->input('device_name'));
+    }
 
-        // enforce max devices
-        $this->deviceService->enforceDeviceLimit($user);
+    public function loginWithData(LoginData $data): array
+    {
+        if (!$this->securityService->allowLoginAttempt($data->email, $data->ipAddress)) {
+            throw new TooManyAttemptsException();
+        }
+
+        if (!Auth::attempt(['email' => $data->email, 'password' => $data->password])) {
+            $this->securityService->recordFailedAttempt($data->email, $data->ipAddress);
+            throw new InvalidCredentialsException();
+        }
+
+        $user = Auth::user();
+
+        if (config('authmaster.enable_2fa') && $this->twoFactorService->isTwoFactorRequiredFor($user)) {
+            $this->twoFactorService->generateAndSend($user, $data->deviceId);
+            throw new TwoFactorRequiredException();
+        }
 
         $this->securityService->clearFailedAttempts($user->email);
 
-        return ['success' => true, 'data' => array_merge(['user' => $user], ['token' => $tokenData])];
+        return $this->finalizeLoginFromData($user, $data->deviceId, $data->deviceName);
+    }
+
+    /**
+     * Finalize the login process: create token, store session, and enforce limits.
+     */
+    public function finalizeLogin($user, Request $request, string $deviceId, string $deviceName = null): array
+    {
+        $tokenData = $this->tokenService->createTokenForUser($user, $deviceId);
+
+        $this->deviceService->createOrUpdateSession($user, $deviceId, $request, $tokenData['token_id'] ?? null, $tokenData, $deviceName);
+
+        $this->deviceService->enforceDeviceLimit($user);
+
+        return ['success' => true, 'data' => ['user' => $user, 'token' => $tokenData]];
+    }
+
+    /**
+     * Finalize login using device data directly (for DTO-based flows).
+     */
+    public function finalizeLoginFromData($user, string $deviceId, ?string $deviceName = null): array
+    {
+        $tokenData = $this->tokenService->createTokenForUser($user, $deviceId);
+
+        // Create a minimal request-like object for session storage
+        $this->deviceService->createOrUpdateSessionFromData($user, $deviceId, $tokenData['token_id'] ?? null, $tokenData, $deviceName);
+
+        $this->deviceService->enforceDeviceLimit($user);
+
+        return ['user' => $user, 'token' => $tokenData];
     }
 
     public function register(Request $request): array
     {
         $data = $request->only(['name', 'email', 'password']);
         $deviceId = $this->extractDeviceId($request);
+        $deviceName = $request->input('device_name');
 
         $userModel = config('auth.providers.users.model');
         $user = new $userModel();
@@ -95,11 +139,7 @@ class AuthManager
         // Auto-login after registration
         Auth::login($user);
 
-        $tokenData = $this->tokenService->createTokenForUser($user, $deviceId);
-        $this->deviceService->createOrUpdateSession($user, $deviceId, $request, $tokenData['token_id'] ?? null, $tokenData);
-        $this->deviceService->enforceDeviceLimit($user);
-
-        return ['success' => true, 'data' => array_merge(['user' => $user], ['token' => $tokenData])];
+        return $this->finalizeLogin($user, $request, $deviceId, $deviceName);
     }
 
     public function logoutCurrentDevice(Request $request): void
@@ -146,6 +186,15 @@ class AuthManager
         return $this->passwordService->resetPassword($payload);
     }
 
+    public function resetPasswordWithData(PasswordResetData $data): array
+    {
+        return $this->passwordService->resetPassword([
+            'email' => $data->email,
+            'password' => $data->password,
+            'token' => $data->token,
+        ]);
+    }
+
     public function sendTwoFactor($user): array
     {
         return $this->twoFactorService->generateAndSend($user, null);
@@ -158,11 +207,11 @@ class AuthManager
 
     public function socialRedirect($provider): array
     {
-        return (new SocialLoginService())->redirect($provider);
+        return $this->socialLoginService->redirect($provider);
     }
 
     public function handleSocialCallback($provider, Request $request): array
     {
-        return (new SocialLoginService())->handleCallback($provider, $request);
+        return $this->socialLoginService->handleCallback($provider, $request);
     }
 }

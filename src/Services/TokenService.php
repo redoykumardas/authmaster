@@ -2,11 +2,11 @@
 
 namespace Redoy\AuthMaster\Services;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Carbon\Carbon;
+use Illuminate\Support\Str;
+use Redoy\AuthMaster\Contracts\TokenServiceInterface;
 
-class TokenService
+class TokenService implements TokenServiceInterface
 {
     public function createTokenForUser($user, string $deviceId = null): array
     {

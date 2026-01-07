@@ -34,5 +34,8 @@ abstract class TestCase extends OrchestraTestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Load default Laravel migrations (creates users table)
+        $this->loadLaravelMigrations();
     }
 }

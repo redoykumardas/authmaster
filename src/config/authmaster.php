@@ -37,9 +37,32 @@ return [
         'length' => env('AUTHMASTER_OTP_LENGTH', 6),
         'ttl' => env('AUTHMASTER_OTP_TTL', 300), // seconds
         'force_for_all' => env('AUTHMASTER_OTP_FORCE_FOR_ALL', false),
+
+        // Default OTP for development/testing (only used when APP_ENV != 'production')
+        // Set to null to always use random OTP
+        'dev_otp' => env('AUTHMASTER_DEV_OTP', '123456'),
     ],
 
     'tokens' => [
         'expiration' => env('AUTHMASTER_TOKEN_EXPIRATION', 60 * 24), // minutes
+    ],
+
+    'registration' => [
+        // Email verification method: 'none', 'otp', or 'link'
+        'email_verification' => env('AUTHMASTER_EMAIL_VERIFICATION', 'link'),
+
+        // URL for email verification link (only used when email_verification = 'link')
+        'verification_url' => env('AUTHMASTER_VERIFICATION_URL', '/verify-email'),
+
+        // Verification token/OTP expiration in seconds
+        'verification_expires' => env('AUTHMASTER_VERIFICATION_EXPIRES', 3600), // 1 hour
+
+        // If true, user account is NOT created until email is verified (more secure)
+        // If false, account is created immediately and user must verify later
+        'verify_before_create' => env('AUTHMASTER_VERIFY_BEFORE_CREATE', true),
+
+        // Default Token for development/testing (only used when APP_ENV != 'production')
+        // Set to null to always use random Token
+        'dev_token' => env('AUTHMASTER_DEV_TOKEN', 'dev-verification-token'),
     ],
 ];

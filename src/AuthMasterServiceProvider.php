@@ -3,23 +3,88 @@
 namespace Redoy\AuthMaster;
 
 use Illuminate\Support\ServiceProvider;
+use Redoy\AuthMaster\Contracts;
+use Redoy\AuthMaster\Services;
 
 class AuthMasterServiceProvider extends ServiceProvider
 {
     public function register()
     {
-        // Merge package config
         $this->mergeConfigFrom(__DIR__ . '/config/authmaster.php', 'authmaster');
 
-        // Bind core services
-        $this->app->singleton(Services\AuthManager::class);
-        $this->app->singleton(Services\TokenService::class);
-        $this->app->singleton(Services\PasswordService::class);
-        $this->app->singleton(Services\TwoFactorService::class);
-        $this->app->singleton(Services\SocialLoginService::class);
-        $this->app->singleton(Services\SecurityService::class);
-        $this->app->singleton(Services\ValidationManager::class);
-        $this->app->singleton(Services\DeviceSessionService::class);
+        $this->registerContracts();
+    }
+
+    /**
+     * Register interface bindings for dependency injection.
+     */
+    protected function registerContracts(): void
+    {
+        // OTP Generator (no dependencies)
+        $this->app->singleton(
+            Contracts\OtpGeneratorInterface::class,
+            Services\OtpGenerator::class
+        );
+
+        // Token Service (no dependencies)
+        $this->app->singleton(
+            Contracts\TokenServiceInterface::class,
+            Services\TokenService::class
+        );
+
+        // Device Session Service (no dependencies)
+        $this->app->singleton(
+            Contracts\DeviceSessionServiceInterface::class,
+            Services\DeviceSessionService::class
+        );
+
+        // Password Service (no dependencies)
+        $this->app->singleton(
+            Contracts\PasswordServiceInterface::class,
+            Services\PasswordService::class
+        );
+
+        // Security Service (no dependencies)
+        $this->app->singleton(
+            Contracts\SecurityServiceInterface::class,
+            Services\SecurityService::class
+        );
+
+        // Validation Manager (no dependencies)
+        $this->app->singleton(
+            Contracts\ValidationManagerInterface::class,
+            Services\ValidationManager::class
+        );
+
+        // Two Factor Service (depends on OtpGenerator)
+        $this->app->singleton(
+            Contracts\TwoFactorServiceInterface::class,
+            Services\TwoFactorService::class
+        );
+
+        // Email Verification Service (depends on OtpGenerator)
+        $this->app->singleton(
+            Contracts\EmailVerificationServiceInterface::class,
+            Services\EmailVerificationService::class
+        );
+
+        // Social Login Service (depends on TokenService, DeviceSessionService)
+        $this->app->singleton(
+            Contracts\SocialLoginServiceInterface::class,
+            Services\SocialLoginService::class
+        );
+
+        // Auth Manager (depends on multiple services)
+        $this->app->singleton(
+            Contracts\AuthManagerInterface::class,
+            Services\AuthManager::class
+        );
+
+        // Registration Service (depends on AuthManager, EmailVerificationService)
+        $this->app->singleton(
+            Contracts\RegistrationServiceInterface::class,
+            Services\RegistrationService::class
+        );
     }
 
     public function boot()
@@ -48,11 +113,12 @@ class AuthMasterServiceProvider extends ServiceProvider
             __DIR__ . '/database/migrations' => database_path('migrations'),
         ], 'migrations');
 
-        // Register middleware alias
+        // Register middleware aliases
         if ($this->app->bound('router')) {
             $router = $this->app->make('router');
             if (method_exists($router, 'aliasMiddleware')) {
                 $router->aliasMiddleware('authmaster.attach_device', Http\Middleware\AttachDeviceId::class);
+                $router->aliasMiddleware('authmaster.verified', Http\Middleware\EnsureEmailIsVerified::class);
             }
         }
     }

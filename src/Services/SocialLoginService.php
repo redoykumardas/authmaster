@@ -4,17 +4,18 @@ namespace Redoy\AuthMaster\Services;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Redoy\AuthMaster\Contracts\DeviceSessionServiceInterface;
+use Redoy\AuthMaster\Contracts\SocialLoginServiceInterface;
+use Redoy\AuthMaster\Contracts\TokenServiceInterface;
 
-class SocialLoginService
+class SocialLoginService implements SocialLoginServiceInterface
 {
-    protected ?\Closure $socialiteFactory = null;
-
-    public function __construct()
-    {
-        // Socialite may not be available; we will check at runtime
+    public function __construct(
+        protected TokenServiceInterface $tokenService,
+        protected DeviceSessionServiceInterface $deviceService
+    ) {
     }
 
     protected function socialiteAvailable(): bool
@@ -71,18 +72,14 @@ class SocialLoginService
             $user = new $userModel();
             $user->name = $socialUser->getName() ?? $socialUser->getNickname() ?? 'No Name';
             $user->email = $socialUser->getEmail();
-            // random password
             $user->password = Hash::make(Str::random(24));
             $user->save();
         }
 
-        // create token
         $deviceId = hash('sha256', $request->ip() . '|' . $request->userAgent());
-        $tokenService = app(TokenService::class);
-        $deviceService = app(DeviceSessionService::class);
 
-        $tokenData = $tokenService->createTokenForUser($user, $deviceId);
-        $deviceService->createOrUpdateSession($user, $deviceId, $request, $tokenData['token_id'] ?? null, $tokenData);
+        $tokenData = $this->tokenService->createTokenForUser($user, $deviceId);
+        $this->deviceService->createOrUpdateSession($user, $deviceId, $request, $tokenData['token_id'] ?? null, $tokenData);
 
         return ['success' => true, 'data' => ['user' => $user, 'token' => $tokenData]];
     }
