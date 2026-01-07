@@ -54,6 +54,7 @@ class RegistrationService implements RegistrationServiceInterface
             pendingRegistration: true,
             devVerificationUrl: $result['dev_verification_url'] ?? null,
             devToken: $result['dev_token'] ?? null,
+            status: 200,
         );
     }
 
@@ -76,10 +77,11 @@ class RegistrationService implements RegistrationServiceInterface
 
             return new AuthResult(
                 user: $user,
-                token: $tokenResult['token'] ?? null,
+                token: $tokenResult->token ?? null,
                 message: 'Registered. Please verify your email.',
                 emailVerificationRequired: true,
                 emailVerificationMethod: $this->emailVerification->getVerificationMethod(),
+                status: 201,
             );
         }
 
@@ -87,8 +89,9 @@ class RegistrationService implements RegistrationServiceInterface
 
         return new AuthResult(
             user: $user,
-            token: $tokenResult['token'] ?? null,
+            token: $tokenResult->token ?? null,
             message: 'Registered successfully',
+            status: 201,
         );
     }
 
@@ -123,8 +126,9 @@ class RegistrationService implements RegistrationServiceInterface
 
                 return new AuthResult(
                     user: $user,
-                    token: $tokenResult['token'] ?? null,
+                    token: $tokenResult->token ?? null,
                     message: $result['message'],
+                    status: 201,
                 );
             }
 
@@ -171,8 +175,9 @@ class RegistrationService implements RegistrationServiceInterface
 
                 return new AuthResult(
                     user: $user,
-                    token: $tokenResult['token'] ?? null,
+                    token: $tokenResult->token ?? null,
                     message: $result['message'],
+                    status: 201,
                 );
             }
         }

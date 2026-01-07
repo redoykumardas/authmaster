@@ -2,22 +2,24 @@
 
 namespace Redoy\AuthMaster\Tests\Feature\Auth;
 
+use Redoy\AuthMaster\Contracts\AuthManagerInterface;
+use Redoy\AuthMaster\DTOs\AuthResult;
 use Redoy\AuthMaster\Services\AuthManager;
 
 class LoginTest extends AuthTestCase
 {
     public function test_login_success_returns_200()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('login')->willReturn([
-            'success' => true,
-            'data' => ['token' => 'abc'],
-        ]);
+        $auth = $this->createMock(AuthManagerInterface::class);
+        $auth->method('loginWithData')->willReturn(new AuthResult(
+            user: (object) ['id' => 1, 'name' => 'Test', 'email' => 'test@example.com'],
+            token: ['token' => 'abc'],
+            message: 'Logged in'
+        ));
 
         $this->bindAuth($auth);
-        $this->bindValidator();
 
-        $this->postJson('/auth/login', [
+        $this->postJson('/api/auth/login', [
             'email' => 'test@example.com',
             'password' => 'secret',
         ])
@@ -27,16 +29,12 @@ class LoginTest extends AuthTestCase
 
     public function test_login_failure_returns_401()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('login')->willReturn([
-            'success' => false,
-            'message' => 'Invalid credentials',
-        ]);
+        $auth = $this->createMock(AuthManagerInterface::class);
+        $auth->method('loginWithData')->willThrowException(new \Redoy\AuthMaster\Exceptions\InvalidCredentialsException('Invalid credentials'));
 
         $this->bindAuth($auth);
-        $this->bindValidator();
 
-        $this->postJson('/auth/login', [
+        $this->postJson('/api/auth/login', [
             'email' => 'bad@example.com',
             'password' => 'wrong',
         ])

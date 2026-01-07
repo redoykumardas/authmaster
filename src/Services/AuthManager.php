@@ -14,6 +14,7 @@ use Redoy\AuthMaster\Contracts\SocialLoginServiceInterface;
 use Redoy\AuthMaster\Contracts\TokenServiceInterface;
 use Redoy\AuthMaster\Contracts\TwoFactorServiceInterface;
 use Redoy\AuthMaster\Contracts\ValidationManagerInterface;
+use Redoy\AuthMaster\DTOs\AuthResult;
 use Redoy\AuthMaster\DTOs\LoginData;
 use Redoy\AuthMaster\DTOs\PasswordResetData;
 use Redoy\AuthMaster\Exceptions\InvalidCredentialsException;
@@ -42,19 +43,19 @@ class AuthManager implements AuthManagerInterface
         return hash('sha256', $request->ip() . '|' . $request->userAgent());
     }
 
-    public function login(Request $request): array
+    public function login(Request $request): AuthResult
     {
         $credentials = $request->only('email', 'password');
         $deviceId = $this->extractDeviceId($request);
 
         // Security checks: rate limit, lockout
         if (!$this->securityService->allowLoginAttempt($credentials['email'] ?? null, $request->ip())) {
-            return ['success' => false, 'message' => 'Too many login attempts.'];
+            throw new TooManyAttemptsException();
         }
 
         if (!Auth::attempt($credentials)) {
             $this->securityService->recordFailedAttempt($credentials['email'] ?? null, $request->ip());
-            return ['success' => false, 'message' => 'Invalid credentials'];
+            throw new InvalidCredentialsException();
         }
 
         $user = Auth::user();
@@ -63,7 +64,7 @@ class AuthManager implements AuthManagerInterface
         if (config('authmaster.enable_2fa') && $this->twoFactorService->isTwoFactorRequiredFor($user)) {
             // send OTP and require verification flow in caller
             $this->twoFactorService->generateAndSend($user, $deviceId);
-            return ['success' => false, 'message' => '2fa_required'];
+            throw new TwoFactorRequiredException();
         }
 
         $this->securityService->clearFailedAttempts($user->email);
@@ -71,7 +72,7 @@ class AuthManager implements AuthManagerInterface
         return $this->finalizeLogin($user, $request, $deviceId, $request->input('device_name'));
     }
 
-    public function loginWithData(LoginData $data): array
+    public function loginWithData(LoginData $data): AuthResult
     {
         if (!$this->securityService->allowLoginAttempt($data->email, $data->ipAddress)) {
             throw new TooManyAttemptsException();
@@ -97,7 +98,7 @@ class AuthManager implements AuthManagerInterface
     /**
      * Finalize the login process: create token, store session, and enforce limits.
      */
-    public function finalizeLogin($user, Request $request, string $deviceId, string $deviceName = null): array
+    public function finalizeLogin($user, Request $request, string $deviceId, string $deviceName = null): AuthResult
     {
         $tokenData = $this->tokenService->createTokenForUser($user, $deviceId);
 
@@ -105,13 +106,17 @@ class AuthManager implements AuthManagerInterface
 
         $this->deviceService->enforceDeviceLimit($user);
 
-        return ['success' => true, 'data' => ['user' => $user, 'token' => $tokenData]];
+        return new AuthResult(
+            user: $user,
+            token: $tokenData,
+            message: 'Logged in'
+        );
     }
 
     /**
      * Finalize login using device data directly (for DTO-based flows).
      */
-    public function finalizeLoginFromData($user, string $deviceId, ?string $deviceName = null): array
+    public function finalizeLoginFromData($user, string $deviceId, ?string $deviceName = null): AuthResult
     {
         $tokenData = $this->tokenService->createTokenForUser($user, $deviceId);
 
@@ -120,10 +125,14 @@ class AuthManager implements AuthManagerInterface
 
         $this->deviceService->enforceDeviceLimit($user);
 
-        return ['user' => $user, 'token' => $tokenData];
+        return new AuthResult(
+            user: $user,
+            token: $tokenData,
+            message: 'Logged in'
+        );
     }
 
-    public function register(Request $request): array
+    public function register(Request $request): AuthResult
     {
         $data = $request->only(['name', 'email', 'password']);
         $deviceId = $this->extractDeviceId($request);
@@ -159,59 +168,94 @@ class AuthManager implements AuthManagerInterface
         }
     }
 
-    public function updateProfile($user, array $data)
+    public function updateProfile($user, array $data): AuthResult
     {
         $user->fill($data);
         $user->save();
-        return $user;
+        return new AuthResult(user: $user, message: 'Profile updated');
     }
 
-    public function changePassword($user, array $payload): array
+    public function changePassword($user, array $payload): AuthResult
     {
         if (!Hash::check($payload['current_password'], $user->password)) {
-            return ['success' => false, 'message' => 'Current password does not match'];
+            throw new \Redoy\AuthMaster\Exceptions\AuthException('Current password does not match', 422);
         }
         $user->password = Hash::make($payload['password']);
         $user->save();
-        return ['success' => true];
+        return new AuthResult(message: 'Password changed');
     }
 
-    public function sendPasswordResetLink(array $payload): array
+    public function sendPasswordResetLink(array $payload): AuthResult
     {
-        return $this->passwordService->sendResetLink($payload['email']);
+        $result = $this->passwordService->sendResetLink($payload['email']);
+        if (!$result['success']) {
+            throw new \Redoy\AuthMaster\Exceptions\AuthException($result['message'] ?? 'Failed to send reset email', 422);
+        }
+        return new AuthResult(message: 'Reset email sent');
     }
 
-    public function resetPassword(array $payload): array
+    public function resetPassword(array $payload): AuthResult
     {
-        return $this->passwordService->resetPassword($payload);
+        $result = $this->passwordService->resetPassword($payload);
+        if (!$result['success']) {
+            throw new \Redoy\AuthMaster\Exceptions\AuthException($result['message'] ?? 'Failed to reset password', 422);
+        }
+        return new AuthResult(message: 'Password reset');
     }
 
-    public function resetPasswordWithData(PasswordResetData $data): array
+    public function resetPasswordWithData(PasswordResetData $data): AuthResult
     {
-        return $this->passwordService->resetPassword([
+        $result = $this->passwordService->resetPassword([
             'email' => $data->email,
             'password' => $data->password,
             'token' => $data->token,
         ]);
+
+        if (!$result['success']) {
+            throw new \Redoy\AuthMaster\Exceptions\AuthException($result['message'] ?? 'Failed to reset password', 422);
+        }
+
+        return new AuthResult(message: 'Password reset');
     }
 
-    public function sendTwoFactor($user): array
+    public function sendTwoFactor($user): AuthResult
     {
-        return $this->twoFactorService->generateAndSend($user, null);
+        $result = $this->twoFactorService->generateAndSend($user, null);
+        if (!$result['success']) {
+            throw new \Redoy\AuthMaster\Exceptions\AuthException($result['message'] ?? 'Failed to send OTP', 422);
+        }
+        return new AuthResult(message: 'OTP sent');
     }
 
-    public function verifyTwoFactor($user, $code): array
+    public function verifyTwoFactor($user, $code): AuthResult
     {
-        return $this->twoFactorService->verify($user, $code);
+        $result = $this->twoFactorService->verify($user, $code);
+        if (!$result['success']) {
+            throw new \Redoy\AuthMaster\Exceptions\AuthException($result['message'] ?? 'Invalid code', 422);
+        }
+        return new AuthResult(message: 'OTP verified');
     }
 
-    public function socialRedirect($provider): array
+    public function socialRedirect($provider): AuthResult
     {
-        return $this->socialLoginService->redirect($provider);
+        $result = $this->socialLoginService->redirect($provider);
+        if (isset($result['redirect'])) {
+            // This is a special case where we might need to return a redirect response
+            // For now, let's keep it in AuthResult? 
+            // Actually socialRedirect is different. Let's return AuthResult with a special property maybe?
+            // Or just return the redirect from here if we want thin controllers.
+            // But AuthResult is Responsable.
+            return new AuthResult(user: $result['redirect'], message: 'Redirecting');
+        }
+        throw new \Redoy\AuthMaster\Exceptions\AuthException($result['message'] ?? 'Provider not available', 400);
     }
 
-    public function handleSocialCallback($provider, Request $request): array
+    public function handleSocialCallback($provider, Request $request): AuthResult
     {
-        return $this->socialLoginService->handleCallback($provider, $request);
+        $result = $this->socialLoginService->handleCallback($provider, $request);
+        if (!$result['success']) {
+            throw new \Redoy\AuthMaster\Exceptions\AuthException($result['message'] ?? 'Social login failed', 400);
+        }
+        return new AuthResult(user: $result['data'], message: 'Social login successful');
     }
 }

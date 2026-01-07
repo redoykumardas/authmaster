@@ -3,6 +3,7 @@
 namespace Redoy\AuthMaster\Contracts;
 
 use Illuminate\Http\Request;
+use Redoy\AuthMaster\DTOs\AuthResult;
 
 interface AuthManagerInterface
 {
@@ -20,16 +21,16 @@ interface AuthManagerInterface
      * @param Request $request The HTTP request with credentials
      * @return array Result with success status and user/token data
      */
-    public function login(Request $request): array;
+    public function login(Request $request): AuthResult;
 
     /**
      * Authenticate a user with DTO data.
      *
      * @param \Redoy\AuthMaster\DTOs\LoginData $data Login data
-     * @return array Result with user and token data
+     * @return AuthResult Result with user and token data
      * @throws \Redoy\AuthMaster\Exceptions\AuthException On failure
      */
-    public function loginWithData(\Redoy\AuthMaster\DTOs\LoginData $data): array;
+    public function loginWithData(\Redoy\AuthMaster\DTOs\LoginData $data): AuthResult;
 
     /**
      * Finalize login process after authentication.
@@ -38,9 +39,9 @@ interface AuthManagerInterface
      * @param Request $request The HTTP request
      * @param string $deviceId The device identifier
      * @param string|null $deviceName Optional device name
-     * @return array Result with token data
+     * @return AuthResult Result with token data
      */
-    public function finalizeLogin($user, Request $request, string $deviceId, string $deviceName = null): array;
+    public function finalizeLogin($user, Request $request, string $deviceId, string $deviceName = null): AuthResult;
 
     /**
      * Finalize login using device data directly (for DTO-based flows).
@@ -48,17 +49,17 @@ interface AuthManagerInterface
      * @param mixed $user The authenticated user
      * @param string $deviceId The device identifier
      * @param string|null $deviceName Optional device name
-     * @return array Result with token data
+     * @return AuthResult Result with token data
      */
-    public function finalizeLoginFromData($user, string $deviceId, ?string $deviceName = null): array;
+    public function finalizeLoginFromData($user, string $deviceId, ?string $deviceName = null): AuthResult;
 
     /**
      * Register a new user.
      *
      * @param Request $request The HTTP request with registration data
-     * @return array Result with success status and user/token data
+     * @return AuthResult Result with success status and user/token data
      */
-    public function register(Request $request): array;
+    public function register(Request $request): AuthResult;
 
     /**
      * Logout from the current device.
@@ -79,74 +80,74 @@ interface AuthManagerInterface
      *
      * @param mixed $user The user instance
      * @param array $data Profile data to update
-     * @return mixed The updated user
+     * @return AuthResult The updated user result
      */
-    public function updateProfile($user, array $data);
+    public function updateProfile($user, array $data): AuthResult;
 
     /**
      * Change user password.
      *
      * @param mixed $user The user instance
      * @param array $payload Password change data
-     * @return array Result with success status
+     * @return AuthResult Result with success status
      */
-    public function changePassword($user, array $payload): array;
+    public function changePassword($user, array $payload): AuthResult;
 
     /**
      * Send password reset link.
      *
      * @param array $payload Contains email
-     * @return array Result with success status
+     * @return AuthResult Result with success status
      */
-    public function sendPasswordResetLink(array $payload): array;
+    public function sendPasswordResetLink(array $payload): AuthResult;
 
     /**
      * Reset user password.
      *
      * @param array $payload Password reset data
-     * @return array Result with success status
+     * @return AuthResult Result with success status
      */
-    public function resetPassword(array $payload): array;
+    public function resetPassword(array $payload): AuthResult;
 
     /**
      * Reset user password with DTO data.
      *
      * @param \Redoy\AuthMaster\DTOs\PasswordResetData $data Password reset data
-     * @return array Result with success status
+     * @return AuthResult Result with success status
      */
-    public function resetPasswordWithData(\Redoy\AuthMaster\DTOs\PasswordResetData $data): array;
+    public function resetPasswordWithData(\Redoy\AuthMaster\DTOs\PasswordResetData $data): AuthResult;
 
     /**
      * Send 2FA code to user.
      *
      * @param mixed $user The user instance
-     * @return array Result with success status
+     * @return AuthResult Result with success status
      */
-    public function sendTwoFactor($user): array;
+    public function sendTwoFactor($user): AuthResult;
 
     /**
      * Verify 2FA code.
      *
      * @param mixed $user The user instance
      * @param string $code The 2FA code
-     * @return array Result with success status
+     * @return AuthResult Result with success status
      */
-    public function verifyTwoFactor($user, $code): array;
+    public function verifyTwoFactor($user, $code): AuthResult;
 
     /**
      * Get social login redirect URL.
      *
      * @param string $provider The social provider
-     * @return array Result with redirect URL
+     * @return AuthResult Result with redirect URL
      */
-    public function socialRedirect($provider): array;
+    public function socialRedirect($provider): AuthResult;
 
     /**
      * Handle social login callback.
      *
      * @param string $provider The social provider
      * @param Request $request The HTTP request
-     * @return array Result with user/token data
+     * @return AuthResult Result with user/token data
      */
-    public function handleSocialCallback($provider, Request $request): array;
+    public function handleSocialCallback($provider, Request $request): AuthResult;
 }

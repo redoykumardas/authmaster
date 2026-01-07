@@ -2,19 +2,15 @@
 
 namespace Redoy\AuthMaster\Http\Controllers;
 
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Redoy\AuthMaster\Contracts\AuthManagerInterface;
 use Redoy\AuthMaster\Contracts\RegistrationServiceInterface;
+use Redoy\AuthMaster\DTOs\AuthResult;
 use Redoy\AuthMaster\DTOs\LoginData;
 use Redoy\AuthMaster\DTOs\PasswordResetData;
 use Redoy\AuthMaster\DTOs\RegisterData;
 use Redoy\AuthMaster\DTOs\VerifyEmailData;
-use Redoy\AuthMaster\Exceptions\AuthException;
-use Redoy\AuthMaster\Exceptions\InvalidCredentialsException;
-use Redoy\AuthMaster\Exceptions\TooManyAttemptsException;
-use Redoy\AuthMaster\Exceptions\TwoFactorRequiredException;
 use Redoy\AuthMaster\Http\Requests\ChangePasswordRequest;
 use Redoy\AuthMaster\Http\Requests\ForgotPasswordRequest;
 use Redoy\AuthMaster\Http\Requests\LoginRequest;
@@ -23,166 +19,115 @@ use Redoy\AuthMaster\Http\Requests\ResetPasswordRequest;
 use Redoy\AuthMaster\Http\Requests\UpdateProfileRequest;
 use Redoy\AuthMaster\Http\Requests\Verify2faRequest;
 use Redoy\AuthMaster\Http\Requests\VerifyEmailRequest;
-use Redoy\AuthMaster\Traits\ApiResponse;
 
 class AuthController extends Controller
 {
-    use ApiResponse;
-
     public function __construct(
         protected AuthManagerInterface $authManager,
         protected RegistrationServiceInterface $registrationService
     ) {
     }
 
-    public function login(LoginRequest $request): JsonResponse
+    public function login(LoginRequest $request)
     {
-        $data = LoginData::fromRequest($request);
-        $result = $this->authManager->loginWithData($data);
-
-        return $this->success($result, 'Logged in');
+        return $this->authManager->loginWithData(
+            LoginData::fromRequest($request)
+        );
     }
 
-    public function register(RegisterRequest $request): JsonResponse
+    public function register(RegisterRequest $request)
     {
-        $data = RegisterData::fromRequest($request);
-        $result = $this->registrationService->register($data);
-
-        $statusCode = $result->pendingRegistration ? 200 : 201;
-
-        return $this->success($result->toArray(), $result->message ?? 'Registered', $statusCode);
+        // dd(RegisterData::fromRequest($request));
+        return $this->registrationService->register(
+            RegisterData::fromRequest($request)
+        );
     }
 
-    public function verifyEmail(VerifyEmailRequest $request): JsonResponse
+    public function verifyEmail(VerifyEmailRequest $request)
     {
-        $data = VerifyEmailData::fromRequest($request);
-        $result = $this->registrationService->verifyEmail($data);
-
-        $statusCode = $result->token ? 201 : 200;
-
-        return $this->success($result->toArray(), $result->message ?? 'Email verified', $statusCode);
+        return $this->registrationService->verifyEmail(
+            VerifyEmailData::fromRequest($request)
+        );
     }
 
-    public function resendVerification(Request $request): JsonResponse
+    public function resendVerification(Request $request)
     {
-        $user = $request->user();
-
-        if (!$user) {
-            throw new AuthException('Authentication required', 401);
-        }
-
-        $this->registrationService->resendVerification($user);
-
-        return $this->success([], 'Verification sent');
+        return $this->registrationService->resendVerification($request->user());
     }
 
-    public function logout(Request $request): JsonResponse
+    public function logout(Request $request)
     {
         $this->authManager->logoutCurrentDevice($request);
-
-        return $this->success([], 'Logged out');
+        return new AuthResult(message: 'Logged out');
     }
 
-    public function logoutAll(Request $request): JsonResponse
+    public function logoutAll(Request $request)
     {
         $this->authManager->logoutAllDevices($request);
-
-        return $this->success([], 'Logged out from all devices');
+        return new AuthResult(message: 'Logged out from all devices');
     }
 
-    public function profile(Request $request): JsonResponse
+    public function profile(Request $request)
     {
-        return $this->success(['user' => $request->user()]);
+        return new AuthResult(user: $request->user());
     }
 
-    public function updateProfile(UpdateProfileRequest $request): JsonResponse
+    public function updateProfile(UpdateProfileRequest $request)
     {
-        $user = $this->authManager->updateProfile($request->user(), $request->validated());
-
-        return $this->success(['user' => $user], 'Profile updated');
+        return $this->authManager->updateProfile(
+            $request->user(),
+            $request->validated()
+        );
     }
 
-    public function changePassword(ChangePasswordRequest $request): JsonResponse
+    public function changePassword(ChangePasswordRequest $request)
     {
-        $result = $this->authManager->changePassword($request->user(), $request->validated());
-
-        if (!$result['success']) {
-            throw new AuthException($result['message'] ?? 'Failed to change password', 422);
-        }
-
-        return $this->success([], 'Password changed');
+        return $this->authManager->changePassword(
+            $request->user(),
+            $request->validated()
+        );
     }
 
-    public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
+    public function forgotPassword(ForgotPasswordRequest $request)
     {
-        $result = $this->authManager->sendPasswordResetLink($request->validated());
-
-        if (!$result['success']) {
-            throw new AuthException($result['message'] ?? 'Failed to send reset email', 422);
-        }
-
-        return $this->success([], 'Reset email sent');
+        return $this->authManager->sendPasswordResetLink($request->validated());
     }
 
-    public function resetPassword(ResetPasswordRequest $request): JsonResponse
+    public function resetPassword(ResetPasswordRequest $request)
     {
-        $data = PasswordResetData::fromRequest($request);
-        $result = $this->authManager->resetPasswordWithData($data);
-
-        if (!$result['success']) {
-            throw new AuthException($result['message'] ?? 'Failed to reset password', 422);
-        }
-
-        return $this->success([], 'Password reset');
+        return $this->authManager->resetPasswordWithData(
+            PasswordResetData::fromRequest($request)
+        );
     }
 
-    public function send2fa(Request $request): JsonResponse
+    public function send2fa(Request $request)
     {
-        $user = $request->user();
-
-        if (!$user) {
-            throw new AuthException('Authentication required', 401);
-        }
-
-        $result = $this->authManager->sendTwoFactor($user);
-
-        if (!$result['success']) {
-            throw new AuthException($result['message'] ?? 'Failed to send OTP', 422);
-        }
-
-        return $this->success([], 'OTP sent');
+        return $this->authManager->sendTwoFactor($request->user());
     }
 
-    public function verify2fa(Verify2faRequest $request): JsonResponse
+    public function verify2fa(Verify2faRequest $request)
     {
-        $result = $this->authManager->verifyTwoFactor($request->user(), $request->validated('code'));
-
-        if (!$result['success']) {
-            throw new AuthException($result['message'] ?? 'Invalid code', 422);
-        }
-
-        return $this->success([], 'OTP verified');
+        return $this->authManager->verifyTwoFactor(
+            $request->user(),
+            $request->validated('code')
+        );
     }
 
     public function socialRedirect(Request $request, string $provider)
     {
         $result = $this->authManager->socialRedirect($provider);
 
-        if (isset($result['redirect'])) {
-            return $result['redirect'];
+        // Handle special redirect logic if needed, 
+        // though AuthResult::toResponse could also handle it if we add a redirect property.
+        if ($result->user instanceof \Illuminate\Http\RedirectResponse) {
+            return $result->user;
         }
 
-        throw new AuthException($result['message'] ?? 'Provider not available', 400);
+        return $result;
     }
 
-    public function socialCallback(Request $request, string $provider): JsonResponse
+    public function socialCallback(Request $request, string $provider)
     {
-        $result = $this->authManager->handleSocialCallback($provider, $request);
-
-        if (!$result['success']) {
-            throw new AuthException($result['message'] ?? 'Social login failed', 400);
-        }
-
-        return $this->success($result['data'], 'Social login successful');
+        return $this->authManager->handleSocialCallback($provider, $request);
     }
 }

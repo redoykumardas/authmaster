@@ -3,8 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use Redoy\AuthMaster\Http\Controllers\AuthController;
 
-// Public routes
-Route::group(['prefix' => 'auth', 'middleware' => ['api']], function () {
+Route::prefix('auth')->group(function () {
+    // Public routes
     Route::post('login', [AuthController::class, 'login']);
     Route::post('register', [AuthController::class, 'register']);
 
@@ -14,29 +14,22 @@ Route::group(['prefix' => 'auth', 'middleware' => ['api']], function () {
     Route::post('social/{provider}', [AuthController::class, 'socialRedirect']);
     Route::get('social/{provider}/callback', [AuthController::class, 'socialCallback']);
 
-    // 2FA endpoints can be used in both flows; keep public for login flow and protected via token for user flow
+    // 2FA endpoints
     Route::post('2fa/verify', [AuthController::class, 'verify2fa']);
 
-    // Email verification (link-based can be public, OTP needs auth)
-    Route::post('verify-email', [AuthController::class, 'verifyEmail']);
-    Route::get('verify-email', [AuthController::class, 'verifyEmail']);
-});
+    // Email verification
+    Route::match(['get', 'post'], 'verify-email', [AuthController::class, 'verifyEmail']);
 
-$authMiddleware = config('authmaster.auth_middleware', 'auth:sanctum');
-Route::group(['prefix' => 'auth', 'middleware' => ['api', $authMiddleware, 'authmaster.verified']], function () {
-    Route::post('logout', [AuthController::class, 'logout']);
-    Route::post('logout/all', [AuthController::class, 'logoutAll']);
-    Route::get('profile', [AuthController::class, 'profile']);
-    Route::patch('profile', [AuthController::class, 'updateProfile']);
+    // Protected routes
+    $authMiddleware = config('authmaster.auth_middleware', 'auth:sanctum');
 
-    Route::post('password/change', [AuthController::class, 'changePassword']);
-
-    Route::post('2fa/send', [AuthController::class, 'send2fa']);
-
-    // Resend email verification (requires auth but NOT verified email - moved below)
-});
-
-// Routes that need auth but NOT email verification
-Route::group(['prefix' => 'auth', 'middleware' => ['api', $authMiddleware]], function () {
-    Route::post('resend-verification', [AuthController::class, 'resendVerification']);
+    Route::middleware([$authMiddleware])->group(function () {
+        Route::post('logout', [AuthController::class, 'logout']);
+        Route::post('logout/all', [AuthController::class, 'logoutAll']);
+        Route::get('profile', [AuthController::class, 'profile']);
+        Route::patch('profile', [AuthController::class, 'updateProfile']);
+        Route::post('password/change', [AuthController::class, 'changePassword']);
+        Route::post('2fa/send', [AuthController::class, 'send2fa']);
+        Route::post('resend-verification', [AuthController::class, 'resendVerification']);
+    });
 });

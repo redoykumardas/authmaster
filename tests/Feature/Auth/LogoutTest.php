@@ -10,11 +10,11 @@ class LogoutTest extends AuthTestCase
     {
         $this->bindAuth($this->createMock(AuthManager::class));
 
-        $this->postJson('/auth/logout')
+        $this->postJson('/api/auth/logout')
             ->assertStatus(200)
             ->assertJsonFragment(['message' => 'Logged out']);
 
-        $this->postJson('/auth/logout/all')
+        $this->postJson('/api/auth/logout/all')
             ->assertStatus(200)
             ->assertJsonFragment(['message' => 'Logged out from all devices']);
     }

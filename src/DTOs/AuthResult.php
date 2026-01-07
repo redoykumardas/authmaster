@@ -2,10 +2,12 @@
 
 namespace Redoy\AuthMaster\DTOs;
 
-readonly class AuthResult
+use Illuminate\Contracts\Support\Responsable;
+
+readonly class AuthResult implements Responsable
 {
     public function __construct(
-        public mixed $user,
+        public mixed $user = null,
         public ?array $token = null,
         public ?string $message = null,
         public bool $emailVerificationRequired = false,
@@ -13,14 +15,26 @@ readonly class AuthResult
         public bool $pendingRegistration = false,
         public ?string $devVerificationUrl = null,
         public ?string $devToken = null,
+        public int $status = 200,
     ) {
+    }
+
+    public function toResponse($request)
+    {
+        return response()->json([
+            'success' => true,
+            'message' => $this->message,
+            'data' => $this->toArray(),
+        ], $this->status);
     }
 
     public function toArray(): array
     {
-        $data = [
-            'user' => $this->user,
-        ];
+        $data = [];
+
+        if ($this->user) {
+            $data['user'] = $this->user;
+        }
 
         if ($this->token) {
             $data['token'] = $this->token;

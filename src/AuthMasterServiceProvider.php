@@ -2,6 +2,7 @@
 
 namespace Redoy\AuthMaster;
 
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Redoy\AuthMaster\Contracts;
 use Redoy\AuthMaster\Services;
@@ -94,8 +95,12 @@ class AuthMasterServiceProvider extends ServiceProvider
             __DIR__ . '/config/authmaster.php' => config_path('authmaster.php'),
         ], 'config');
 
-        // Load routes
-        $this->loadRoutesFrom(__DIR__ . '/routes/api.php');
+        // Load routes with proper prefix and middleware
+        Route::prefix('api')
+            ->middleware('api')
+            ->group(function () {
+                $this->loadRoutesFrom(__DIR__ . '/routes/api.php');
+            });
 
         // Load migrations if exists in package
         if (is_dir(__DIR__ . '/database/migrations')) {

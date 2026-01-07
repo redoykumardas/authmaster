@@ -2,11 +2,13 @@
 
 namespace Redoy\AuthMaster\Tests\Feature\Auth;
 
-use Redoy\AuthMaster\Services\AuthManager;
+use Redoy\AuthMaster\Contracts\RegistrationServiceInterface;
+use Redoy\AuthMaster\DTOs\AuthResult;
+use Redoy\AuthMaster\Exceptions\AuthException;
 
 class RegisterTest extends AuthTestCase
 {
-    protected string $endpoint = '/auth/register';
+    protected string $endpoint = '/api/auth/register';
     protected string $defaultName = 'Test User';
     protected string $defaultPassword = 'SecurePass123!';
     protected string $defaultEmail = 'user@example.com';
@@ -19,19 +21,20 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_successful_registration_returns_201()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => true,
-            'data' => ['id' => 1, 'user' => ['name' => $this->defaultName]],
-        ]);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willReturn(new AuthResult(
+            user: (object) ['id' => 1, 'name' => $this->defaultName],
+            message: 'Registered',
+            status: 201
+        ));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
             'email' => $this->defaultEmail,
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ])
             ->assertStatus(201)
             ->assertJsonFragment(['message' => 'Registered']);
@@ -40,40 +43,41 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_successful_registration_returns_token()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => true,
-            'data' => ['id' => 1, 'user' => ['name' => 'Test User'], 'token' => ['token' => $this->defaultToken]],
-        ]);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willReturn(new AuthResult(
+            user: (object) ['id' => 1, 'name' => 'Test User'],
+            token: ['token' => $this->defaultToken],
+            status: 201
+        ));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
             'email' => $this->defaultEmail,
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ])
             ->assertStatus(201)
-            ->assertJsonStructure(['success', 'message', 'data']);
+            ->assertJsonStructure(['success', 'message', 'data' => ['user', 'token']]);
     }
 
     /** @test */
     public function test_registration_with_device_id_header()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => true,
-            'data' => ['id' => 1, 'user' => ['name' => 'Test User', 'email' => 'test@example.com']],
-        ]);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willReturn(new AuthResult(
+            user: (object) ['id' => 1, 'name' => 'Test User', 'email' => 'test@example.com'],
+            status: 201
+        ));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
             'email' => $this->defaultEmail,
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ], ['device_id' => 'test-device-123'])
             ->assertStatus(201);
     }
@@ -85,19 +89,16 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_registration_fails_when_email_already_exists()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => false,
-            'message' => 'Email already exists',
-        ]);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willThrowException(new AuthException('Email already exists', 422));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
             'email' => 'existing@example.com',
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ])
             ->assertStatus(422)
             ->assertJsonFragment(['message' => 'Email already exists']);
@@ -110,19 +111,16 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_registration_fails_with_blocked_email_domain()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => false,
-            'message' => 'Email domain not allowed',
-        ]);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willThrowException(new AuthException('Email domain not allowed', 422));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
             'email' => 'user@spam.com',
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ])
             ->assertStatus(422)
             ->assertJsonFragment(['message' => 'Email domain not allowed']);
@@ -131,19 +129,16 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_registration_fails_with_disposable_email()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => false,
-            'message' => 'Disposable email addresses are not allowed',
-        ]);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willThrowException(new AuthException('Disposable email addresses are not allowed', 422));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
             'email' => 'user@tempmail.com',
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ])
             ->assertStatus(422)
             ->assertJsonFragment(['message' => 'Disposable email addresses are not allowed']);
@@ -156,19 +151,16 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_registration_rate_limited_returns_422()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => false,
-            'message' => 'Too many registration attempts. Please try again later.',
-        ]);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willThrowException(new AuthException('Too many registration attempts. Please try again later.', 422));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
             'email' => $this->defaultEmail,
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ])
             ->assertStatus(422)
             ->assertJsonFragment(['message' => 'Too many registration attempts. Please try again later.']);
@@ -181,14 +173,13 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_registration_handles_sql_injection_in_name()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => true,
-            'data' => ['id' => 1, 'user' => ['name' => 'Test User', 'email' => 'test@example.com']],
-        ]);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willReturn(new AuthResult(
+            user: (object) ['id' => 1, 'name' => 'Test User', 'email' => 'test@example.com'],
+            status: 201
+        ));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         $maliciousName = "Robert'); DROP TABLE users;--";
 
@@ -196,6 +187,7 @@ class RegisterTest extends AuthTestCase
             'name' => $maliciousName,
             'email' => $this->defaultEmail,
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ])
             ->assertStatus(201);
     }
@@ -203,14 +195,13 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_registration_handles_sql_injection_in_email()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => true,
-            'data' => ['id' => 1, 'user' => ['name' => 'Test User', 'email' => 'test@example.com']],
-        ]);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willReturn(new AuthResult(
+            user: (object) ['id' => 1, 'name' => 'Test User', 'email' => 'test@example.com'],
+            status: 201
+        ));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         $maliciousEmail = "test@example.com' OR '1'='1";
 
@@ -219,8 +210,9 @@ class RegisterTest extends AuthTestCase
             'name' => $this->defaultName,
             'email' => $maliciousEmail,
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ])
-            ->assertStatus(201); // Mock bypasses validation, real would be 422
+            ->assertStatus(422);
     }
 
     // =========================================================================
@@ -230,14 +222,13 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_registration_handles_xss_in_name()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => true,
-            'data' => ['id' => 1, 'user' => ['name' => 'Test User', 'email' => 'test@example.com']],
-        ]);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willReturn(new AuthResult(
+            user: (object) ['id' => 1, 'name' => 'Test User', 'email' => 'test@example.com'],
+            status: 201
+        ));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         $xssPayload = '<script>alert("XSS")</script>';
 
@@ -245,6 +236,7 @@ class RegisterTest extends AuthTestCase
             'name' => $xssPayload,
             'email' => $this->defaultEmail,
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ])
             ->assertStatus(201);
     }
@@ -252,14 +244,13 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_registration_handles_html_injection_in_name()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => true,
-            'data' => ['id' => 1, 'user' => ['name' => 'Test User', 'email' => 'test@example.com']],
-        ]);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willReturn(new AuthResult(
+            user: (object) ['id' => 1, 'name' => 'Test User', 'email' => 'test@example.com'],
+            status: 201
+        ));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         $htmlPayload = '<img src=x onerror=alert(1)>';
 
@@ -267,6 +258,7 @@ class RegisterTest extends AuthTestCase
             'name' => $htmlPayload,
             'email' => $this->defaultEmail,
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ])
             ->assertStatus(201);
     }
@@ -278,20 +270,19 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_registration_ignores_unauthorized_fields()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => true,
-            'data' => ['id' => 1, 'user' => ['name' => 'Test User', 'email' => 'test@example.com']],
-        ]);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willReturn(new AuthResult(
+            user: (object) ['id' => 1, 'name' => 'Test User', 'email' => 'test@example.com'],
+            status: 201
+        ));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
-        // Try to pass admin role or other protected fields
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
             'email' => $this->defaultEmail,
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
             'is_admin' => true,
             'role' => 'admin',
             'verified_at' => now(),
@@ -306,19 +297,19 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_registration_with_minimum_valid_name_length()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => true,
-            'data' => ['id' => 1, 'user' => ['name' => 'Test User', 'email' => 'test@example.com']],
-        ]);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willReturn(new AuthResult(
+            user: (object) ['id' => 1, 'name' => 'Test User', 'email' => 'test@example.com'],
+            status: 201
+        ));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         $this->postJson($this->endpoint, [
             'name' => 'A',
             'email' => $this->defaultEmail,
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ])
             ->assertStatus(201);
     }
@@ -326,14 +317,13 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_registration_with_maximum_valid_name_length()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => true,
-            'data' => ['id' => 1, 'user' => ['name' => 'Test User', 'email' => 'test@example.com']],
-        ]);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willReturn(new AuthResult(
+            user: (object) ['id' => 1, 'name' => 'Test User', 'email' => 'test@example.com'],
+            status: 201
+        ));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         $longName = str_repeat('A', 255);
 
@@ -341,6 +331,7 @@ class RegisterTest extends AuthTestCase
             'name' => $longName,
             'email' => $this->defaultEmail,
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ])
             ->assertStatus(201);
     }
@@ -348,14 +339,13 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_registration_with_unicode_characters_in_name()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => true,
-            'data' => ['id' => 1, 'user' => ['name' => 'Test User', 'email' => 'test@example.com']],
-        ]);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willReturn(new AuthResult(
+            user: (object) ['id' => 1, 'name' => 'Test User', 'email' => 'test@example.com'],
+            status: 201
+        ));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         $unicodeName = '张伟 مریم Müller 田中';
 
@@ -363,6 +353,7 @@ class RegisterTest extends AuthTestCase
             'name' => $unicodeName,
             'email' => $this->defaultEmail,
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ])
             ->assertStatus(201);
     }
@@ -370,14 +361,13 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_registration_with_emoji_in_name()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => true,
-            'data' => ['id' => 1, 'user' => ['name' => 'Test User', 'email' => 'test@example.com']],
-        ]);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willReturn(new AuthResult(
+            user: (object) ['id' => 1, 'name' => 'Test User', 'email' => 'test@example.com'],
+            status: 201
+        ));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         $emojiName = 'Test User 🚀';
 
@@ -385,6 +375,7 @@ class RegisterTest extends AuthTestCase
             'name' => $emojiName,
             'email' => $this->defaultEmail,
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ])
             ->assertStatus(201);
     }
@@ -396,19 +387,19 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_registration_with_subdomain_email()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => true,
-            'data' => ['id' => 1, 'user' => ['name' => 'Test User', 'email' => 'test@example.com']],
-        ]);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willReturn(new AuthResult(
+            user: (object) ['id' => 1, 'name' => 'Test User', 'email' => 'test@example.com'],
+            status: 201
+        ));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
             'email' => 'user@mail.example.com',
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ])
             ->assertStatus(201);
     }
@@ -416,19 +407,19 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_registration_with_plus_sign_email()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => true,
-            'data' => ['id' => 1, 'user' => ['name' => 'Test User', 'email' => 'test@example.com']],
-        ]);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willReturn(new AuthResult(
+            user: (object) ['id' => 1, 'name' => 'Test User', 'email' => 'test@example.com'],
+            status: 201
+        ));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
             'email' => 'user+test@example.com',
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ])
             ->assertStatus(201);
     }
@@ -436,19 +427,19 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_registration_with_uppercase_email()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => true,
-            'data' => ['id' => 1, 'user' => ['name' => 'Test User', 'email' => 'test@example.com']],
-        ]);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willReturn(new AuthResult(
+            user: (object) ['id' => 1, 'name' => 'Test User', 'email' => 'test@example.com'],
+            status: 201
+        ));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
             'email' => 'USER@EXAMPLE.COM',
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ])
             ->assertStatus(201);
     }
@@ -460,16 +451,16 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_registration_handles_internal_server_error()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willThrowException(new \Exception('Database connection failed'));
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willThrowException(new \Exception('Database connection failed'));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
             'email' => $this->defaultEmail,
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ])
             ->assertStatus(500);
     }
@@ -481,49 +472,42 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_successful_registration_response_structure()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => true,
-            'data' => [
-                'id' => 1,
-                'user' => ['name' => $this->defaultName, 'email' => $this->defaultEmail],
-                'token' => ['token' => $this->defaultToken],
-            ],
-        ]);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willReturn(new AuthResult(
+            user: (object) ['id' => 1, 'name' => $this->defaultName, 'email' => $this->defaultEmail],
+            token: ['token' => $this->defaultToken],
+            status: 201
+        ));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
             'email' => $this->defaultEmail,
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ])
             ->assertStatus(201)
             ->assertJsonStructure([
                 'success',
                 'message',
-                'data',
+                'data' => ['user', 'token'],
             ]);
     }
 
     /** @test */
     public function test_failed_registration_response_structure()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => false,
-            'message' => 'Registration failed',
-            'errors' => ['email' => ['Email already exists']],
-        ]);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willThrowException(new AuthException('Registration failed', 422));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
             'email' => $this->defaultEmail,
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ])
             ->assertStatus(422)
             ->assertJsonStructure([
@@ -539,19 +523,19 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_registration_returns_json_content_type()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => true,
-            'data' => ['id' => 1, 'user' => ['name' => 'Test User', 'email' => 'test@example.com']],
-        ]);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willReturn(new AuthResult(
+            user: (object) ['id' => 1, 'name' => 'Test User', 'email' => 'test@example.com'],
+            status: 201
+        ));
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         $response = $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
             'email' => $this->defaultEmail,
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ]);
 
         $response->assertStatus(201);
@@ -565,24 +549,24 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_multiple_registrations_with_same_email_handled()
     {
-        $auth = $this->createMock(AuthManager::class);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
         $callCount = 0;
-        $auth->method('register')->willReturnCallback(function () use (&$callCount) {
+        $registration->method('register')->willReturnCallback(function () use (&$callCount) {
             $callCount++;
             if ($callCount === 1) {
-                return ['success' => true, 'data' => ['id' => 1, 'user' => ['name' => 'Test User', 'email' => 'test@example.com']]];
+                return new AuthResult(user: (object) ['id' => 1, 'name' => 'Test User', 'email' => 'test@example.com'], status: 201);
             }
-            return ['success' => false, 'message' => 'Email already exists'];
+            throw new AuthException('Email already exists', 422);
         });
 
-        $this->bindAuth($auth);
-        $this->bindValidator();
+        $this->bindRegistrationService($registration);
 
         // First registration
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
             'email' => 'unique@example.com',
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ])->assertStatus(201);
 
         // Second registration with same email
@@ -590,6 +574,7 @@ class RegisterTest extends AuthTestCase
             'name' => 'Another User',
             'email' => 'unique@example.com',
             'password' => $this->defaultPassword,
+            'password_confirmation' => $this->defaultPassword,
         ])->assertStatus(422);
     }
 
@@ -601,9 +586,8 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_validation_fails_when_name_is_missing()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $this->bindAuth($auth);
-        // Use real validator by NOT calling bindValidator()
+        // Use real RegistrationService mock from AuthTestCase
+        // Use real validator by NOT calling bindValidator() (which doesn't exist anyway)
 
         $this->postJson($this->endpoint, [
             'email' => $this->defaultEmail,
@@ -617,8 +601,6 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_validation_fails_when_name_exceeds_255_characters()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $this->bindAuth($auth);
 
         $this->postJson($this->endpoint, [
             'name' => str_repeat('A', 256),
@@ -633,8 +615,6 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_validation_fails_when_email_is_missing()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $this->bindAuth($auth);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
@@ -648,8 +628,6 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_validation_fails_when_email_format_is_invalid()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $this->bindAuth($auth);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
@@ -664,8 +642,6 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_validation_fails_when_email_missing_at_symbol()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $this->bindAuth($auth);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
@@ -680,8 +656,6 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_validation_fails_when_email_missing_domain()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $this->bindAuth($auth);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
@@ -696,8 +670,6 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_validation_fails_when_password_is_missing()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $this->bindAuth($auth);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
@@ -710,8 +682,6 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_validation_fails_when_password_is_less_than_8_characters()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $this->bindAuth($auth);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
@@ -726,8 +696,6 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_validation_fails_when_password_confirmation_missing()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $this->bindAuth($auth);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
@@ -742,8 +710,6 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_validation_fails_when_password_confirmation_does_not_match()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $this->bindAuth($auth);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
@@ -758,8 +724,6 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_validation_fails_when_all_fields_are_empty()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $this->bindAuth($auth);
 
         $this->postJson($this->endpoint, [])
             ->assertStatus(422)
@@ -769,8 +733,6 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_validation_fails_with_empty_string_values()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $this->bindAuth($auth);
 
         $this->postJson($this->endpoint, [
             'name' => '',
@@ -784,8 +746,6 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_validation_fails_with_null_values()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $this->bindAuth($auth);
 
         $this->postJson($this->endpoint, [
             'name' => null,
@@ -799,12 +759,12 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_validation_passes_with_exactly_8_character_password()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => true,
-            'data' => ['id' => 1, 'user' => ['name' => 'Test User', 'email' => 'test@example.com']],
-        ]);
-        $this->bindAuth($auth);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willReturn(new AuthResult(
+            user: (object) ['id' => 1, 'name' => 'Test User', 'email' => 'test@example.com'],
+            status: 201
+        ));
+        $this->bindRegistrationService($registration);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
@@ -818,12 +778,12 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_validation_passes_with_exactly_255_character_name()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => true,
-            'data' => ['id' => 1, 'user' => ['name' => 'Test User', 'email' => 'test@example.com']],
-        ]);
-        $this->bindAuth($auth);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willReturn(new AuthResult(
+            user: (object) ['id' => 1, 'name' => 'Test User', 'email' => 'test@example.com'],
+            status: 201
+        ));
+        $this->bindRegistrationService($registration);
 
         $this->postJson($this->endpoint, [
             'name' => str_repeat('A', 255), // exactly 255 chars
@@ -837,12 +797,12 @@ class RegisterTest extends AuthTestCase
     /** @test */
     public function test_validation_accepts_device_name()
     {
-        $auth = $this->createMock(AuthManager::class);
-        $auth->method('register')->willReturn([
-            'success' => true,
-            'data' => ['id' => 1, 'user' => ['name' => 'Test User', 'email' => 'test@example.com']],
-        ]);
-        $this->bindAuth($auth);
+        $registration = $this->createMock(RegistrationServiceInterface::class);
+        $registration->method('register')->willReturn(new AuthResult(
+            user: (object) ['id' => 1, 'name' => 'Test User', 'email' => 'test@example.com'],
+            status: 201
+        ));
+        $this->bindRegistrationService($registration);
 
         $this->postJson($this->endpoint, [
             'name' => $this->defaultName,
@@ -859,6 +819,7 @@ class RegisterTest extends AuthTestCase
     {
         \Illuminate\Support\Facades\Mail::fake();
         // Use real service instead of mock from AuthTestCase
+        $this->app->forgetInstance(RegistrationServiceInterface::class);
         $this->app->forgetInstance(\Redoy\AuthMaster\Services\EmailVerificationService::class);
 
         config(['authmaster.registration.email_verification' => 'otp']);
@@ -881,6 +842,7 @@ class RegisterTest extends AuthTestCase
     public function test_link_registration_includes_dev_info_in_local()
     {
         \Illuminate\Support\Facades\Mail::fake();
+        $this->app->forgetInstance(RegistrationServiceInterface::class);
         $this->app->forgetInstance(\Redoy\AuthMaster\Services\EmailVerificationService::class);
 
         config(['authmaster.registration.email_verification' => 'link']);
@@ -905,6 +867,7 @@ class RegisterTest extends AuthTestCase
     public function test_dev_info_is_hidden_in_production()
     {
         \Illuminate\Support\Facades\Mail::fake();
+        $this->app->forgetInstance(RegistrationServiceInterface::class);
         $this->app->forgetInstance(\Redoy\AuthMaster\Services\EmailVerificationService::class);
 
         $originalEnv = $this->app['env'];
@@ -932,6 +895,7 @@ class RegisterTest extends AuthTestCase
     public function test_registration_with_device_management()
     {
         \Illuminate\Support\Facades\Mail::fake();
+        $this->app->forgetInstance(RegistrationServiceInterface::class);
         $this->app->forgetInstance(\Redoy\AuthMaster\Services\EmailVerificationService::class);
 
         config(['authmaster.registration.email_verification' => 'otp']);

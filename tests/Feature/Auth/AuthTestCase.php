@@ -37,11 +37,13 @@ abstract class AuthTestCase extends TestCase
             user: (object) ['id' => 1, 'name' => 'Test User', 'email' => 'test@example.com'],
             token: ['token' => 'abc123'],
             message: 'Registered successfully',
+            status: 201,
         ));
 
         $mock->method('verifyEmail')->willReturn(new AuthResult(
             user: (object) ['id' => 1, 'name' => 'Test User', 'email' => 'test@example.com'],
             message: 'Email verified',
+            status: 200,
         ));
 
         $this->app->instance(RegistrationServiceInterface::class, $mock);
@@ -56,7 +58,8 @@ abstract class AuthTestCase extends TestCase
         ?string $message = null,
         bool $emailVerificationRequired = false,
         ?string $emailVerificationMethod = null,
-        bool $pendingRegistration = false
+        bool $pendingRegistration = false,
+        int $status = 200
     ): AuthResult {
         return new AuthResult(
             user: $user ?? (object) ['id' => 1, 'name' => 'Test User', 'email' => 'test@example.com'],
@@ -65,6 +68,7 @@ abstract class AuthTestCase extends TestCase
             emailVerificationRequired: $emailVerificationRequired,
             emailVerificationMethod: $emailVerificationMethod,
             pendingRegistration: $pendingRegistration,
+            status: $status
         );
     }
 }
