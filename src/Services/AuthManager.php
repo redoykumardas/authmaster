@@ -20,6 +20,8 @@ use Redoy\AuthMaster\DTOs\PasswordResetData;
 use Redoy\AuthMaster\Exceptions\InvalidCredentialsException;
 use Redoy\AuthMaster\Exceptions\TooManyAttemptsException;
 use Redoy\AuthMaster\Exceptions\TwoFactorRequiredException;
+use Redoy\AuthMaster\Events\LoginSuccessful;
+use Redoy\AuthMaster\Events\LogoutSuccessful;
 
 class AuthManager implements AuthManagerInterface
 {
@@ -106,11 +108,11 @@ class AuthManager implements AuthManagerInterface
 
         $this->deviceService->enforceDeviceLimit($user);
 
-        return new AuthResult(
+        return (new AuthResult(
             user: $user,
             token: $tokenData,
             message: 'Logged in'
-        );
+        ))->tap(fn($res) => event(new LoginSuccessful($user, $deviceId, $request->ip())));
     }
 
     /**
@@ -120,16 +122,15 @@ class AuthManager implements AuthManagerInterface
     {
         $tokenData = $this->tokenService->createTokenForUser($user, $deviceId);
 
-        // Create a minimal request-like object for session storage
         $this->deviceService->createOrUpdateSessionFromData($user, $deviceId, $tokenData['token_id'] ?? null, $tokenData, $deviceName);
 
         $this->deviceService->enforceDeviceLimit($user);
 
-        return new AuthResult(
+        return (new AuthResult(
             user: $user,
             token: $tokenData,
             message: 'Logged in'
-        );
+        ))->tap(fn($res) => event(new LoginSuccessful($user, $deviceId)));
     }
 
     public function register(Request $request): AuthResult
@@ -157,6 +158,7 @@ class AuthManager implements AuthManagerInterface
         $user = $request->user();
         if ($user) {
             $this->deviceService->invalidateSession($user, $deviceId);
+            event(new LogoutSuccessful($user, $deviceId));
         }
     }
 
@@ -165,6 +167,7 @@ class AuthManager implements AuthManagerInterface
         $user = $request->user();
         if ($user) {
             $this->deviceService->invalidateAllSessions($user);
+            event(new LogoutSuccessful($user));
         }
     }
 
@@ -240,11 +243,6 @@ class AuthManager implements AuthManagerInterface
     {
         $result = $this->socialLoginService->redirect($provider);
         if (isset($result['redirect'])) {
-            // This is a special case where we might need to return a redirect response
-            // For now, let's keep it in AuthResult? 
-            // Actually socialRedirect is different. Let's return AuthResult with a special property maybe?
-            // Or just return the redirect from here if we want thin controllers.
-            // But AuthResult is Responsable.
             return new AuthResult(user: $result['redirect'], message: 'Redirecting');
         }
         throw new \Redoy\AuthMaster\Exceptions\AuthException($result['message'] ?? 'Provider not available', 400);

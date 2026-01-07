@@ -2,13 +2,37 @@
 
 namespace Redoy\AuthMaster;
 
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Redoy\AuthMaster\Contracts;
 use Redoy\AuthMaster\Services;
+use Redoy\AuthMaster\Events;
+use Redoy\AuthMaster\Listeners;
 
 class AuthMasterServiceProvider extends ServiceProvider
 {
+    /**
+     * The event listener mappings for the package.
+     *
+     * @var array
+     */
+    protected $listen = [
+        Events\LoginSuccessful::class => [
+            Listeners\LogSecurityActivity::class,
+        ],
+        Events\LogoutSuccessful::class => [
+            Listeners\LogSecurityActivity::class,
+        ],
+        Events\FailedLoginAttempt::class => [
+            Listeners\LogSecurityActivity::class,
+        ],
+        Events\SuspiciousActivityDetected::class => [
+            Listeners\LogSecurityActivity::class,
+            Listeners\NotifySuspiciousActivity::class,
+        ],
+    ];
+
     public function register()
     {
         $this->mergeConfigFrom(__DIR__ . '/config/authmaster.php', 'authmaster');
@@ -117,6 +141,21 @@ class AuthMasterServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__ . '/database/migrations' => database_path('migrations'),
         ], 'migrations');
+
+        // Register event listeners
+        foreach ($this->listen as $event => $listeners) {
+            foreach ($listeners as $listener) {
+                Event::listen($event, $listener);
+            }
+        }
+
+        // Register commands
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                Console\Commands\ClearInactiveSessions::class,
+                Console\Commands\ManageUser::class,
+            ]);
+        }
 
         // Register middleware aliases
         if ($this->app->bound('router')) {

@@ -3,9 +3,11 @@
 namespace Redoy\AuthMaster\DTOs;
 
 use Illuminate\Contracts\Support\Responsable;
+use Illuminate\Support\Traits\Tappable;
 
 readonly class AuthResult implements Responsable
 {
+    use Tappable;
     public function __construct(
         public mixed $user = null,
         public ?array $token = null,

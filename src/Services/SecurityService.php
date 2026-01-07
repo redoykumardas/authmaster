@@ -2,53 +2,71 @@
 
 namespace Redoy\AuthMaster\Services;
 
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Redoy\AuthMaster\Contracts\SecurityServiceInterface;
+use Redoy\AuthMaster\Events\FailedLoginAttempt;
+use Redoy\AuthMaster\Events\SuspiciousActivityDetected;
 
 class SecurityService implements SecurityServiceInterface
 {
-    protected function attemptsKey(?string $email, string $ip)
-    {
-        return 'authmaster_attempts:' . ($email ?? 'guest') . ':' . $ip;
-    }
-
     public function allowLoginAttempt(?string $email, string $ip): bool
     {
-        $key = $this->attemptsKey($email, $ip);
-        $attempts = Cache::get($key, 0);
         $max = config('authmaster.security.max_login_attempts', 5);
         if ($max <= 0) {
             return true;
         }
-        return $attempts < $max;
+
+        $attempt = DB::table('authmaster_login_attempts')
+            ->where('email', $email)
+            ->where('ip_address', $ip)
+            ->first();
+
+        if (!$attempt) {
+            return true;
+        }
+
+        $lockoutMinutes = config('authmaster.security.lockout_duration_minutes', 15);
+        $isLockedOut = $attempt->attempts >= $max &&
+            $attempt->last_attempt_at > now()->subMinutes($lockoutMinutes);
+
+        return !$isLockedOut;
     }
 
     public function recordFailedAttempt(?string $email, string $ip): void
     {
-        $key = $this->attemptsKey($email, $ip);
-        $ttl = config('authmaster.security.lockout_duration_minutes', 15) * 60;
-        $attempts = Cache::increment($key);
-        Cache::put($key, $attempts, $ttl);
+        DB::table('authmaster_login_attempts')->updateOrInsert(
+            ['email' => $email, 'ip_address' => $ip],
+            [
+                'attempts' => DB::raw('attempts + 1'),
+                'last_attempt_at' => now(),
+                'updated_at' => now(),
+            ]
+        );
 
-        // If exceeds threshold, optionally notify user
+        $attempt = DB::table('authmaster_login_attempts')
+            ->where('email', $email)
+            ->where('ip_address', $ip)
+            ->first();
+
+        $attempts = $attempt->attempts ?? 0;
+
+        event(new FailedLoginAttempt($email, $ip));
+
         $max = config('authmaster.security.max_login_attempts', 5);
-        if ($attempts >= $max && config('authmaster.security.notify_on_suspicious', true)) {
-            try {
-                // TODO: send notification email to user if email provided
-                // Mail::to($email)->send(new SuspiciousLoginMail(...));
-            } catch (\Throwable $e) {
-                Log::error('AuthMaster: failed to send suspicious login notification: ' . $e->getMessage());
-            }
+        if ($attempts >= $max) {
+            event(new SuspiciousActivityDetected(
+                type: 'account_lockout',
+                email: $email,
+                ipAddress: $ip,
+                metadata: ['attempts' => $attempts]
+            ));
         }
     }
 
     public function clearFailedAttempts(string $email): void
     {
-        // Clear attempts for all ips for this email
-        // This is a simple implementation: clears keys matching pattern - requires cache store supporting tags or iteration.
-        // For simplicity store only exact email + ip keys; callers can clear exact key if needed. We'll clear common patterns.
-        // Not implemented complex scan here.
+        DB::table('authmaster_login_attempts')->where('email', $email)->delete();
     }
 }

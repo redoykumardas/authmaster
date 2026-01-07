@@ -4,16 +4,11 @@ namespace Redoy\AuthMaster\Services;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Redoy\AuthMaster\Contracts\DeviceSessionServiceInterface;
+use Redoy\AuthMaster\Models\DeviceSession;
 
 class DeviceSessionService implements DeviceSessionServiceInterface
 {
-    protected function userCacheKey($userId): string
-    {
-        return "authmaster:device_sessions:{$userId}";
-    }
-
     public function createOrUpdateSession($user, string $deviceId, Request $request, $tokenId = null, array $tokenData = [], string $deviceName = null)
     {
         return $this->storeSession(
@@ -42,32 +37,19 @@ class DeviceSessionService implements DeviceSessionServiceInterface
 
     protected function storeSession($user, string $deviceId, $tokenId, array $tokenData, ?string $deviceName, ?string $ipAddress, ?string $userAgent)
     {
-        $key = $this->userCacheKey($user->id);
-        $sessions = Cache::get($key, []);
+        $session = DeviceSession::updateOrCreate(
+            ['user_id' => $user->id, 'device_id' => $deviceId],
+            [
+                'device_name' => $deviceName,
+                'ip_address' => $ipAddress,
+                'user_agent' => $userAgent,
+                'last_active_at' => Carbon::now(),
+                'token_id' => $tokenId,
+                'meta' => ['token' => $tokenData],
+            ]
+        );
 
-        $existing = $sessions[$deviceId] ?? null;
-
-        $meta = array_merge($existing['meta'] ?? [], ['token' => $tokenData]);
-
-        $sessions[$deviceId] = [
-            'user_id' => $user->id,
-            'device_id' => $deviceId,
-            'device_name' => $deviceName,
-            'ip_address' => $ipAddress,
-            'user_agent' => $userAgent,
-            'last_active_at' => Carbon::now()->toDateTimeString(),
-            'token_id' => $tokenId,
-            'meta' => $meta,
-        ];
-
-        $ttl = config('authmaster.device_session_ttl');
-        if ($ttl) {
-            Cache::put($key, $sessions, $ttl);
-        } else {
-            Cache::forever($key, $sessions);
-        }
-
-        return (object) $sessions[$deviceId];
+        return $session;
     }
 
     public function enforceDeviceLimit($user): void
@@ -77,93 +59,69 @@ class DeviceSessionService implements DeviceSessionServiceInterface
             return; // unlimited
         }
 
-        $key = $this->userCacheKey($user->id);
-        $sessions = Cache::get($key, []);
+        $sessions = DeviceSession::where('user_id', $user->id)
+            ->orderBy('last_active_at', 'desc')
+            ->get();
 
-        if (count($sessions) <= $limit) {
+        if ($sessions->count() <= $limit) {
             return;
         }
 
-        // Sort by last_active_at desc
-        uasort($sessions, function ($a, $b) {
-            return strtotime($b['last_active_at']) <=> strtotime($a['last_active_at']);
-        });
+        $toRemove = $sessions->slice($limit);
 
-        $kept = array_slice($sessions, 0, $limit, true);
-        $toRemove = array_slice($sessions, $limit, null, true);
-
-        foreach ($toRemove as $s) {
-            if (!empty($s['token_id']) && method_exists($user, 'tokens')) {
+        foreach ($toRemove as $session) {
+            if (!empty($session->token_id) && method_exists($user, 'tokens')) {
                 try {
-                    $user->tokens()->where('id', $s['token_id'])->delete();
+                    $user->tokens()->where('id', $session->token_id)->delete();
                 } catch (\Throwable $e) {
                     // ignore
                 }
             }
-        }
-
-        // Persist the kept sessions
-        $ttl = config('authmaster.device_session_ttl');
-        if ($ttl) {
-            Cache::put($key, $kept, $ttl);
-        } else {
-            Cache::forever($key, $kept);
+            $session->delete();
         }
     }
 
     public function invalidateSession($user, string $deviceId): void
     {
-        $key = $this->userCacheKey($user->id);
-        $sessions = Cache::get($key, []);
-        $session = $sessions[$deviceId] ?? null;
+        $session = DeviceSession::where('user_id', $user->id)
+            ->where('device_id', $deviceId)
+            ->first();
+
         if (!$session) {
             return;
         }
 
-        if (!empty($session['token_id']) && method_exists($user, 'tokens')) {
+        if (!empty($session->token_id) && method_exists($user, 'tokens')) {
             try {
-                $user->tokens()->where('id', $session['token_id'])->delete();
+                $user->tokens()->where('id', $session->token_id)->delete();
             } catch (\Throwable $e) {
                 // ignore
             }
         }
 
-        unset($sessions[$deviceId]);
-
-        $ttl = config('authmaster.device_session_ttl');
-        if ($ttl) {
-            Cache::put($key, $sessions, $ttl);
-        } else {
-            Cache::forever($key, $sessions);
-        }
+        $session->delete();
     }
 
     public function invalidateAllSessions($user): void
     {
-        $key = $this->userCacheKey($user->id);
-        $sessions = Cache::get($key, []);
+        $sessions = DeviceSession::where('user_id', $user->id)->get();
+
         foreach ($sessions as $session) {
-            if (!empty($session['token_id']) && method_exists($user, 'tokens')) {
+            if (!empty($session->token_id) && method_exists($user, 'tokens')) {
                 try {
-                    $user->tokens()->where('id', $session['token_id'])->delete();
+                    $user->tokens()->where('id', $session->token_id)->delete();
                 } catch (\Throwable $e) {
                     // ignore
                 }
             }
+            $session->delete();
         }
-
-        Cache::forget($key);
     }
 
     public function getActiveSessions($user)
     {
-        $key = $this->userCacheKey($user->id);
-        $sessions = Cache::get($key, []);
-
-        uasort($sessions, function ($a, $b) {
-            return strtotime($b['last_active_at']) <=> strtotime($a['last_active_at']);
-        });
-
-        return collect(array_values($sessions));
+        return DeviceSession::where('user_id', $user->id)
+            ->orderBy('last_active_at', 'desc')
+            ->get();
     }
 }
