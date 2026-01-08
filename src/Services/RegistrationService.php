@@ -2,8 +2,8 @@
 
 namespace Redoy\AuthMaster\Services;
 
+use Illuminate\Contracts\Hashing\Hasher;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Redoy\AuthMaster\Contracts\AuthManagerInterface;
 use Redoy\AuthMaster\Contracts\EmailVerificationServiceInterface;
 use Redoy\AuthMaster\Contracts\RegistrationServiceInterface;
@@ -17,11 +17,15 @@ use Redoy\AuthMaster\Exceptions\VerificationFailedException;
 
 class RegistrationService implements RegistrationServiceInterface
 {
+    protected $userModel;
+
     public function __construct(
         protected AuthManagerInterface $authManager,
         protected EmailVerificationServiceInterface $emailVerification,
-        protected SecurityServiceInterface $securityService
+        protected SecurityServiceInterface $securityService,
+        protected Hasher $hasher
     ) {
+        $this->userModel = config('auth.providers.users.model');
     }
 
     public function register(RegisterData $data): AuthResult
@@ -47,7 +51,7 @@ class RegistrationService implements RegistrationServiceInterface
         $result = $this->emailVerification->storePendingRegistration([
             'name' => $data->name,
             'email' => $data->email,
-            'password' => Hash::make($data->password),
+            'password' => $this->hasher->make($data->password),
             'device_id' => $data->deviceId,
             'device_name' => $data->deviceName,
             'ip_address' => $data->ipAddress,
@@ -72,12 +76,11 @@ class RegistrationService implements RegistrationServiceInterface
 
     protected function handleStandardRegistration(RegisterData $data): AuthResult
     {
-        $userModel = config('auth.providers.users.model');
-        $user = new $userModel();
-        $user->name = $data->name;
-        $user->email = $data->email;
-        $user->password = Hash::make($data->password);
-        $user->save();
+        $user = $this->userModel::create([
+            'name' => $data->name,
+            'email' => $data->email,
+            'password' => $this->hasher->make($data->password),
+        ]);
 
         Auth::login($user);
 
@@ -160,11 +163,17 @@ class RegistrationService implements RegistrationServiceInterface
         }
 
         // Existing user verification
-        $userModel = config('auth.providers.users.model');
-        $user = $userModel::where('email', $data->email)->first();
+        $user = $this->userModel::where('email', $data->email)->first();
 
         if (!$user) {
             throw new VerificationFailedException('No pending registration or user found for this email');
+        }
+
+        if ($this->emailVerification->isVerified($user)) {
+            return new AuthResult(
+                user: $user,
+                message: 'Email is already verified',
+            );
         }
 
         $result = $this->emailVerification->verifyOtp($user, $data->code);

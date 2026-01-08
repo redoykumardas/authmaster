@@ -2,9 +2,9 @@
 
 namespace Redoy\AuthMaster\Services;
 
+use Illuminate\Contracts\Hashing\Hasher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Redoy\AuthMaster\Contracts\AuthManagerInterface;
 use Redoy\AuthMaster\Contracts\DeviceSessionServiceInterface;
@@ -25,6 +25,8 @@ use Redoy\AuthMaster\Events\LogoutSuccessful;
 
 class AuthManager implements AuthManagerInterface
 {
+    protected $userModel;
+
     public function __construct(
         protected ValidationManagerInterface $validator,
         protected TokenServiceInterface $tokenService,
@@ -32,8 +34,10 @@ class AuthManager implements AuthManagerInterface
         protected PasswordServiceInterface $passwordService,
         protected TwoFactorServiceInterface $twoFactorService,
         protected SecurityServiceInterface $securityService,
-        protected SocialLoginServiceInterface $socialLoginService
+        protected SocialLoginServiceInterface $socialLoginService,
+        protected Hasher $hasher
     ) {
+        $this->userModel = config('auth.providers.users.model');
     }
 
     public function extractDeviceId(Request $request): string
@@ -132,18 +136,16 @@ class AuthManager implements AuthManagerInterface
 
     public function updateProfile($user, array $data): AuthResult
     {
-        $user->fill($data);
-        $user->save();
+        $user->update($data);
         return new AuthResult(user: $user, message: 'Profile updated');
     }
 
     public function changePassword($user, array $payload): AuthResult
     {
-        if (!Hash::check($payload['current_password'], $user->password)) {
+        if (!$this->hasher->check($payload['current_password'], $user->password)) {
             throw new \Redoy\AuthMaster\Exceptions\AuthException('Current password does not match', 422);
         }
-        $user->password = Hash::make($payload['password']);
-        $user->save();
+        $user->update(['password' => $this->hasher->make($payload['password'])]);
         return new AuthResult(message: 'Password changed');
     }
 

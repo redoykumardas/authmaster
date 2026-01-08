@@ -11,9 +11,12 @@ use Redoy\AuthMaster\Jobs\SendVerificationLinkJob;
 
 class EmailVerificationService implements EmailVerificationServiceInterface
 {
+    protected $userModel;
+
     public function __construct(
         protected OtpGeneratorInterface $otpGenerator
     ) {
+        $this->userModel = config('auth.providers.users.model');
     }
 
     public function getVerificationMethod(): string
@@ -33,8 +36,9 @@ class EmailVerificationService implements EmailVerificationServiceInterface
 
     public function markAsVerified($user): void
     {
-        $user->email_verified_at = now();
-        $user->save();
+        $user->forceFill([
+            'email_verified_at' => now(),
+        ])->save();
     }
 
     protected function otpCacheKey($userId): string
@@ -150,8 +154,7 @@ class EmailVerificationService implements EmailVerificationServiceInterface
             return ['success' => false, 'message' => 'Verification link expired or invalid'];
         }
 
-        $userModel = config('auth.providers.users.model');
-        $user = $userModel::find($userId);
+        $user = $this->userModel::find($userId);
 
         if (!$user) {
             return ['success' => false, 'message' => 'User not found'];
@@ -188,10 +191,7 @@ class EmailVerificationService implements EmailVerificationServiceInterface
         $email = $data['email'];
         $ttl = config('authmaster.registration.verification_expires', 3600);
 
-        $userModel = config('auth.providers.users.model');
-        if ($userModel::where('email', $email)->exists()) {
-            return ['success' => false, 'message' => 'Email already registered'];
-        }
+        // Check previously handled by RegisterRequest validation
 
         $method = $this->getVerificationMethod();
         $pendingData = [
@@ -271,18 +271,19 @@ class EmailVerificationService implements EmailVerificationServiceInterface
             return ['success' => false, 'message' => 'Invalid verification code'];
         }
 
-        $userModel = config('auth.providers.users.model');
-        if ($userModel::where('email', $email)->exists()) {
+        // Race condition check: re-verify email hasn't been taken in the meantime
+        if ($this->userModel::where('email', $email)->exists()) {
             Cache::forget($key);
             return ['success' => false, 'message' => 'Email already registered'];
         }
 
-        $user = new $userModel();
-        $user->name = $pendingData['name'];
-        $user->email = $pendingData['email'];
-        $user->password = $pendingData['password'];
-        $user->email_verified_at = now();
-        $user->save();
+        $user = $this->userModel::create([
+            'name' => $pendingData['name'],
+            'email' => $pendingData['email'],
+            'password' => $pendingData['password'],
+        ]);
+
+        $this->markAsVerified($user);
 
         Cache::forget($key);
 
@@ -306,18 +307,19 @@ class EmailVerificationService implements EmailVerificationServiceInterface
             return ['success' => false, 'message' => 'Verification link expired or invalid'];
         }
 
-        $userModel = config('auth.providers.users.model');
-        if ($userModel::where('email', $pendingData['email'])->exists()) {
+        // Race condition check: re-verify email hasn't been taken in the meantime
+        if ($this->userModel::where('email', $pendingData['email'])->exists()) {
             Cache::forget($key);
             return ['success' => false, 'message' => 'Email already registered'];
         }
 
-        $user = new $userModel();
-        $user->name = $pendingData['name'];
-        $user->email = $pendingData['email'];
-        $user->password = $pendingData['password'];
-        $user->email_verified_at = now();
-        $user->save();
+        $user = $this->userModel::create([
+            'name' => $pendingData['name'],
+            'email' => $pendingData['email'],
+            'password' => $pendingData['password'],
+        ]);
+
+        $this->markAsVerified($user);
 
         Cache::forget($key);
 
