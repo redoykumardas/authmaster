@@ -15,13 +15,6 @@ interface AuthManagerInterface
      */
     public function extractDeviceId(Request $request): string;
 
-    /**
-     * Authenticate a user with credentials.
-     *
-     * @param Request $request The HTTP request with credentials
-     * @return array Result with success status and user/token data
-     */
-    public function login(Request $request): AuthResult;
 
     /**
      * Authenticate a user with DTO data.
@@ -32,16 +25,6 @@ interface AuthManagerInterface
      */
     public function loginWithData(\Redoy\AuthMaster\DTOs\LoginData $data): AuthResult;
 
-    /**
-     * Finalize login process after authentication.
-     *
-     * @param mixed $user The authenticated user
-     * @param Request $request The HTTP request
-     * @param string $deviceId The device identifier
-     * @param string|null $deviceName Optional device name
-     * @return AuthResult Result with token data
-     */
-    public function finalizeLogin($user, Request $request, string $deviceId, string $deviceName = null): AuthResult;
 
     /**
      * Finalize login using device data directly (for DTO-based flows).
@@ -55,13 +38,6 @@ interface AuthManagerInterface
      */
     public function finalizeLoginFromData($user, string $deviceId, ?string $deviceName = null, ?string $ipAddress = null, ?string $userAgent = null): AuthResult;
 
-    /**
-     * Register a new user.
-     *
-     * @param Request $request The HTTP request with registration data
-     * @return AuthResult Result with success status and user/token data
-     */
-    public function register(Request $request): AuthResult;
 
     /**
      * Logout from the current device.
@@ -103,13 +79,6 @@ interface AuthManagerInterface
      */
     public function sendPasswordResetLink(array $payload): AuthResult;
 
-    /**
-     * Reset user password.
-     *
-     * @param array $payload Password reset data
-     * @return AuthResult Result with success status
-     */
-    public function resetPassword(array $payload): AuthResult;
 
     /**
      * Reset user password with DTO data.

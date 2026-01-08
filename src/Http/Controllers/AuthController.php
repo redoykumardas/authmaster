@@ -37,7 +37,6 @@ class AuthController extends Controller
 
     public function register(RegisterRequest $request)
     {
-        // dd(RegisterData::fromRequest($request));
         return $this->registrationService->register(
             RegisterData::fromRequest($request)
         );

@@ -49,34 +49,6 @@ class AuthManager implements AuthManagerInterface
         return hash('sha256', (string) $request->ip() . '|' . (string) $request->userAgent());
     }
 
-    public function login(Request $request): AuthResult
-    {
-        $credentials = $request->only('email', 'password');
-        $deviceId = $this->extractDeviceId($request);
-
-        // Security checks: rate limit, lockout
-        if (!$this->securityService->allowLoginAttempt($credentials['email'] ?? null, $request->ip(), $deviceId)) {
-            throw new TooManyAttemptsException();
-        }
-
-        if (!Auth::attempt($credentials)) {
-            $this->securityService->recordFailedAttempt($credentials['email'] ?? null, $request->ip(), $deviceId);
-            throw new InvalidCredentialsException();
-        }
-
-        $user = Auth::user();
-
-        // Check 2FA requirement
-        if (config('authmaster.enable_2fa') && $this->twoFactorService->isTwoFactorRequiredFor($user)) {
-            // send OTP and require verification flow in caller
-            $this->twoFactorService->generateAndSend($user, $deviceId);
-            throw new TwoFactorRequiredException();
-        }
-
-        $this->securityService->clearFailedAttempts($user->email);
-
-        return $this->finalizeLogin($user, $request, $deviceId, $request->input('device_name'));
-    }
 
     public function loginWithData(LoginData $data): AuthResult
     {
@@ -110,20 +82,6 @@ class AuthManager implements AuthManagerInterface
     /**
      * Finalize the login process: create token, store session, and enforce limits.
      */
-    public function finalizeLogin($user, Request $request, string $deviceId, string $deviceName = null): AuthResult
-    {
-        $tokenData = $this->tokenService->createTokenForUser($user, $deviceId);
-
-        $this->deviceService->createOrUpdateSession($user, $deviceId, $request, $tokenData['token_id'] ?? null, $tokenData, $deviceName);
-
-        $this->deviceService->enforceDeviceLimit($user);
-
-        return (new AuthResult(
-            user: $user,
-            token: $tokenData,
-            message: 'Logged in'
-        ))->tap(fn($res) => event(new LoginSuccessful($user, $deviceId, $request->ip())));
-    }
 
     /**
      * Finalize login using device data directly (for DTO-based flows).
@@ -151,24 +109,6 @@ class AuthManager implements AuthManagerInterface
         ))->tap(fn($res) => event(new LoginSuccessful($user, $deviceId, $ipAddress)));
     }
 
-    public function register(Request $request): AuthResult
-    {
-        $data = $request->only(['name', 'email', 'password']);
-        $deviceId = $this->extractDeviceId($request);
-        $deviceName = $request->input('device_name');
-
-        $userModel = config('auth.providers.users.model');
-        $user = new $userModel();
-        $user->name = $data['name'];
-        $user->email = $data['email'];
-        $user->password = Hash::make($data['password']);
-        $user->save();
-
-        // Auto-login after registration
-        Auth::login($user);
-
-        return $this->finalizeLogin($user, $request, $deviceId, $deviceName);
-    }
 
     public function logoutCurrentDevice(Request $request): void
     {
@@ -216,14 +156,6 @@ class AuthManager implements AuthManagerInterface
         return new AuthResult(message: 'Reset email sent');
     }
 
-    public function resetPassword(array $payload): AuthResult
-    {
-        $result = $this->passwordService->resetPassword($payload);
-        if (!$result['success']) {
-            throw new \Redoy\AuthMaster\Exceptions\AuthException($result['message'] ?? 'Failed to reset password', 422);
-        }
-        return new AuthResult(message: 'Password reset');
-    }
 
     public function resetPasswordWithData(PasswordResetData $data): AuthResult
     {

@@ -121,15 +121,11 @@ class RegistrationService implements RegistrationServiceInterface
 
     public function verifyEmail(VerifyEmailData $data): AuthResult
     {
-        if ($data->method === 'otp') {
-            return $this->verifyOtp($data);
-        }
-
-        if ($data->method === 'link') {
-            return $this->verifyLink($data);
-        }
-
-        throw new AuthException('Email verification not configured', 400);
+        return match ($data->method) {
+            'otp' => $this->verifyOtp($data),
+            'link' => $this->verifyLink($data),
+            default => throw new AuthException('Email verification not configured', 400),
+        };
     }
 
     protected function verifyOtp(VerifyEmailData $data): AuthResult

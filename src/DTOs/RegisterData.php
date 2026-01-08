@@ -22,7 +22,7 @@ readonly class RegisterData
         $deviceId = $request->header('device_id')
             ?? $request->header('X-Device-Id')
             ?? $request->header('Device-Id')
-            ?? hash('sha256', (string) $request->ip() . '|' . (string) $request->userAgent());
+            ?? authmaster_device_id($request);
 
         $deviceName = $request->input('device_name')
             ?? $request->header('X-Device-Name')

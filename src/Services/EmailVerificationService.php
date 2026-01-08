@@ -90,7 +90,7 @@ class EmailVerificationService implements EmailVerificationServiceInterface
         if (config('authmaster.otp.use_queue', true)) {
             SendOtpJob::dispatch($user, $code);
         } else {
-            (new SendOtpJob($user, $code))->handle();
+            SendOtpJob::dispatchSync($user, $code);
         }
 
         return ['success' => true, 'message' => 'Verification OTP sent to your email'];
@@ -135,7 +135,7 @@ class EmailVerificationService implements EmailVerificationServiceInterface
         if (config('authmaster.otp.use_queue', true)) {
             SendVerificationLinkJob::dispatch($user, $verificationUrl);
         } else {
-            (new SendVerificationLinkJob($user, $verificationUrl))->handle();
+            SendVerificationLinkJob::dispatchSync($user, $verificationUrl);
         }
 
         return ['success' => true, 'message' => 'Verification link sent to your email'];
@@ -218,7 +218,7 @@ class EmailVerificationService implements EmailVerificationServiceInterface
             if (config('authmaster.otp.use_queue', true)) {
                 SendOtpJob::dispatch($tempUser, $code);
             } else {
-                (new SendOtpJob($tempUser, $code))->handle();
+                SendOtpJob::dispatchSync($tempUser, $code);
             }
 
             return ['success' => true, 'message' => 'Verification code sent to your email'];
@@ -242,7 +242,7 @@ class EmailVerificationService implements EmailVerificationServiceInterface
             if (config('authmaster.otp.use_queue', true)) {
                 SendVerificationLinkJob::dispatch($tempUser, $verificationUrl);
             } else {
-                (new SendVerificationLinkJob($tempUser, $verificationUrl))->handle();
+                SendVerificationLinkJob::dispatchSync($tempUser, $verificationUrl);
             }
 
             $result = ['success' => true, 'message' => 'Verification link sent to your email'];
@@ -357,7 +357,7 @@ class EmailVerificationService implements EmailVerificationServiceInterface
         if (config('authmaster.otp.use_queue', true)) {
             SendOtpJob::dispatch($tempUser, $code);
         } else {
-            (new SendOtpJob($tempUser, $code))->handle();
+            SendOtpJob::dispatchSync($tempUser, $code);
         }
 
         return ['success' => true, 'message' => 'New verification code sent'];
