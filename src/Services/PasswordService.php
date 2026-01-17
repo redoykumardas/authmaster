@@ -9,18 +9,16 @@ use Redoy\AuthMaster\Contracts\PasswordServiceInterface;
 
 class PasswordService implements PasswordServiceInterface
 {
-    public function sendResetLink(string $email): array
+    public function sendResetLink(string $email): void
     {
         $status = Password::sendResetLink(['email' => $email]);
 
-        if ($status === Password::RESET_LINK_SENT) {
-            return ['success' => true];
+        if ($status !== Password::RESET_LINK_SENT) {
+            throw new \Redoy\AuthMaster\Exceptions\AuthException(trans($status), 422);
         }
-
-        return ['success' => false, 'message' => trans($status)];
     }
 
-    public function resetPassword(array $payload): array
+    public function resetPassword(array $payload): void
     {
         $status = Password::reset(
             ['email' => $payload['email'], 'password' => $payload['password'], 'token' => $payload['token']],
@@ -31,10 +29,8 @@ class PasswordService implements PasswordServiceInterface
             }
         );
 
-        if ($status === Password::PASSWORD_RESET) {
-            return ['success' => true];
+        if ($status !== Password::PASSWORD_RESET) {
+            throw new \Redoy\AuthMaster\Exceptions\AuthException(trans($status), 422);
         }
-
-        return ['success' => false, 'message' => trans($status)];
     }
 }

@@ -125,4 +125,16 @@ class AuthController extends Controller
     {
         return $this->authManager->handleSocialCallback($provider, $request);
     }
+
+    public function devices(Request $request)
+    {
+        $devices = $this->authManager->getDevices($request->user());
+        return new AuthResult(data: ['devices' => $devices], status: 200);
+    }
+
+    public function removeDevice(Request $request, string $deviceId)
+    {
+        $this->authManager->removeDevice($request->user(), $deviceId);
+        return new AuthResult(message: 'Device removed successfully', status: 200);
+    }
 }

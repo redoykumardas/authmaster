@@ -68,13 +68,12 @@ class SecurityFeaturesTest extends TestCase
         ];
 
         // First request should succeed
-        $result1 = $service->storePendingRegistration($data);
-        $this->assertTrue($result1['success']);
+        $service->storePendingRegistration($data);
 
         // Second immediate request (via resend) should fail
-        $result2 = $service->resendPendingOtp('test@example.com');
-        $this->assertFalse($result2['success']);
-        $this->assertStringContainsString('Please wait', $result2['message']);
+        $this->expectException(\Redoy\AuthMaster\Exceptions\AuthException::class);
+        $this->expectExceptionMessage('Please wait');
+        $service->resendPendingOtp('test@example.com');
     }
 
     /** @test */
@@ -105,15 +104,35 @@ class SecurityFeaturesTest extends TestCase
 
         // Record failed attempts up to the limit
         for ($i = 0; $i < 3; $i++) {
-            $this->assertTrue($security->allowLoginAttempt($email, $ip, $deviceId));
+            $security->allowLoginAttempt($email, $ip, $deviceId);
             $security->recordFailedAttempt($email, $ip, $deviceId);
         }
 
         // Next attempt should be blocked
-        $this->assertFalse($security->allowLoginAttempt($email, $ip, $deviceId));
+        $this->expectException(\Redoy\AuthMaster\Exceptions\TooManyAttemptsException::class);
+        $security->allowLoginAttempt($email, $ip, $deviceId);
 
         // But another device should NOT be blocked for the same email/IP (unless global limit hit)
-        $this->assertTrue($security->allowLoginAttempt($email, $ip, 'different_device'));
+        // (This line won't be reached in this test because of expectException above, I might need to separate them if I want to test both)
+        // Actually I'll just keep the lockout test and maybe add another test for the "different_device" case if I'm being thorough.
+        // But for now let's just make it pass.
+    }
+
+    /** @test */
+    public function test_lockout_does_not_affect_different_device()
+    {
+        $ip = '127.0.0.1';
+        $deviceId = 'device_xyz';
+        $email = 'locked@example.com';
+        $security = app(\Redoy\AuthMaster\Contracts\SecurityServiceInterface::class);
+
+        for ($i = 0; $i < 3; $i++) {
+            $security->recordFailedAttempt($email, $ip, $deviceId);
+        }
+
+        // Different device should still be allowed (void return means no exception)
+        $security->allowLoginAttempt($email, $ip, 'different_device');
+        $this->assertTrue(true); // If we reached here, it's allowed
     }
 
     /** @test */
@@ -146,15 +165,28 @@ class SecurityFeaturesTest extends TestCase
 
         // Limit is 3 in config for this test
         for ($i = 0; $i < 3; $i++) {
-            $this->assertTrue($security->allowRegistrationAttempt($ip, $deviceId));
+            $security->allowRegistrationAttempt($ip, $deviceId);
             $security->recordRegistrationAttempt($ip, $deviceId);
         }
 
         // 4th attempt should be blocked
-        $this->assertFalse($security->allowRegistrationAttempt($ip, $deviceId));
+        $this->expectException(\Redoy\AuthMaster\Exceptions\TooManyAttemptsException::class);
+        $security->allowRegistrationAttempt($ip, $deviceId);
+    }
 
-        // Another device should be fine
-        $this->assertTrue($security->allowRegistrationAttempt($ip, 'reg_device_2'));
+    /** @test */
+    public function test_registration_limit_does_not_affect_different_device()
+    {
+        $ip = '127.0.0.1';
+        $deviceId = 'reg_device_1';
+        $security = app(\Redoy\AuthMaster\Contracts\SecurityServiceInterface::class);
+
+        for ($i = 0; $i < 3; $i++) {
+            $security->recordRegistrationAttempt($ip, $deviceId);
+        }
+
+        $security->allowRegistrationAttempt($ip, 'reg_device_2');
+        $this->assertTrue(true);
     }
 
     /** @test */

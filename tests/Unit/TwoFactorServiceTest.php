@@ -18,9 +18,7 @@ class TwoFactorServiceTest extends TestCase
         $user->id = 10;
         $user->email = 'user@example.com';
 
-        $res = $svc->generateAndSend($user, 'device-x');
-
-        $this->assertTrue($res['success']);
+        $svc->generateAndSend($user, 'device-x');
 
         // Verify code was cached
         $key = "authmaster_otp:{$user->id}:device-x";
@@ -29,28 +27,41 @@ class TwoFactorServiceTest extends TestCase
         Mail::assertSent(\Redoy\AuthMaster\Mail\SendOtpMail::class);
     }
 
-    public function test_verify_success_and_failure_and_expiry()
+    public function test_verify_fails_when_expired()
     {
         $svc = $this->app->make(TwoFactorServiceInterface::class);
         $user = new \stdClass();
         $user->id = 11;
 
+        $this->expectException(\Redoy\AuthMaster\Exceptions\AuthException::class);
+        $this->expectExceptionMessage('Code expired');
+        $svc->verify($user, '000000');
+    }
+
+    public function test_verify_fails_with_wrong_code()
+    {
+        $svc = $this->app->make(TwoFactorServiceInterface::class);
+        $user = new \stdClass();
+        $user->id = 12;
         $key = "authmaster_otp:{$user->id}:global";
 
-        // No code in cache => expiry
-        $res = $svc->verify($user, '000000');
-        $this->assertFalse($res['success']);
-        $this->assertStringContainsString('expired', $res['message']);
-
-        // Put a code and verify wrong code
         Cache::put($key, '123456', 300);
-        $res2 = $svc->verify($user, '000000');
-        $this->assertFalse($res2['success']);
-        $this->assertStringContainsString('Invalid', $res2['message']);
 
-        // Correct code
-        $res3 = $svc->verify($user, '123456');
-        $this->assertTrue($res3['success']);
+        $this->expectException(\Redoy\AuthMaster\Exceptions\AuthException::class);
+        $this->expectExceptionMessage('Invalid code');
+        $svc->verify($user, '000000');
+    }
+
+    public function test_verify_success()
+    {
+        $svc = $this->app->make(TwoFactorServiceInterface::class);
+        $user = new \stdClass();
+        $user->id = 13;
+        $key = "authmaster_otp:{$user->id}:global";
+
+        Cache::put($key, '123456', 300);
+        $svc->verify($user, '123456');
+        
         $this->assertNull(Cache::get($key));
     }
 

@@ -10,16 +10,18 @@ interface SocialLoginServiceInterface
      * Get the redirect URL for a social provider.
      *
      * @param string $provider The social provider name (e.g., 'google', 'facebook')
-     * @return array Result with redirect URL or error
+     * @return \Illuminate\Http\RedirectResponse
+     * @throws \Redoy\AuthMaster\Exceptions\AuthException
      */
-    public function redirect(string $provider): array;
+    public function redirect(string $provider): \Illuminate\Http\RedirectResponse;
 
     /**
      * Handle the callback from a social provider.
      *
      * @param string $provider The social provider name
      * @param Request $request The HTTP request
-     * @return array Result with user data and token or error
+     * @return array Result with user data and token
+     * @throws \Redoy\AuthMaster\Exceptions\AuthException
      */
     public function handleCallback(string $provider, Request $request): array;
 }

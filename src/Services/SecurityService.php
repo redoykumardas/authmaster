@@ -10,7 +10,7 @@ use Redoy\AuthMaster\Events\SuspiciousActivityDetected;
 
 class SecurityService implements SecurityServiceInterface
 {
-    public function allowLoginAttempt(?string $email, string $ip, ?string $deviceId = null): bool
+    public function allowLoginAttempt(?string $email, string $ip, ?string $deviceId = null): void
     {
         // Check global email/IP lockout
         if (
@@ -19,7 +19,7 @@ class SecurityService implements SecurityServiceInterface
                 'ip_address' => $ip
             ], config('authmaster.security.max_login_attempts', 5), config('authmaster.security.lockout_duration_minutes', 15))
         ) {
-            return false;
+            throw new \Redoy\AuthMaster\Exceptions\TooManyAttemptsException('Too many login attempts. Please try again later.');
         }
 
         // Check device-specific lockout
@@ -29,11 +29,9 @@ class SecurityService implements SecurityServiceInterface
                     'device_id' => $deviceId
                 ], config('authmaster.security.max_login_attempts_per_device', 10), config('authmaster.security.device_lockout_duration_minutes', 60))
             ) {
-                return false;
+                throw new \Redoy\AuthMaster\Exceptions\TooManyAttemptsException('Too many login attempts from this device. Please try again later.');
             }
         }
-
-        return true;
     }
 
     protected function isAllowedByAttempts(string $table, array $where, int $max, int $lockoutMinutes): bool
@@ -126,15 +124,17 @@ class SecurityService implements SecurityServiceInterface
         }
     }
 
-    public function allowRegistrationAttempt(string $ip, ?string $deviceId = null): bool
+    public function allowRegistrationAttempt(string $ip, ?string $deviceId = null): void
     {
         $max = config('authmaster.security.max_registration_attempts_per_device', 3);
         $lockout = config('authmaster.security.device_lockout_duration_minutes', 60);
 
-        return $this->isAllowedByAttempts('authmaster_registration_attempts', [
+        if (!$this->isAllowedByAttempts('authmaster_registration_attempts', [
             'ip_address' => $ip,
             'device_id' => $deviceId
-        ], $max, $lockout);
+        ], $max, $lockout)) {
+            throw new \Redoy\AuthMaster\Exceptions\TooManyAttemptsException('Too many registration attempts. Please try again later.');
+        }
     }
 
     public function recordRegistrationAttempt(string $ip, ?string $deviceId = null): void

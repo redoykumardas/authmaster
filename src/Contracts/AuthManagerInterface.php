@@ -121,4 +121,19 @@ interface AuthManagerInterface
      * @return AuthResult Result with user/token data
      */
     public function handleSocialCallback($provider, Request $request): AuthResult;
+    /**
+     * Get all logged in devices for the user.
+     *
+     * @param mixed $user
+     * @return \Illuminate\Support\Collection
+     */
+    public function getDevices($user);
+
+    /**
+     * Remove/Logout a specific device for the user.
+     *
+     * @param mixed $user
+     * @param string $deviceId
+     */
+    public function removeDevice($user, string $deviceId): void;
 }

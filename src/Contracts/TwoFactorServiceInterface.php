@@ -9,9 +9,10 @@ interface TwoFactorServiceInterface
      *
      * @param mixed $user The user instance
      * @param string|null $deviceId Optional device identifier
-     * @return array Result with success status
+     * @return void
+     * @throws \Redoy\AuthMaster\Exceptions\AuthException
      */
-    public function generateAndSend($user, ?string $deviceId = null): array;
+    public function generateAndSend($user, ?string $deviceId = null): void;
 
     /**
      * Verify a 2FA OTP code.
@@ -19,9 +20,10 @@ interface TwoFactorServiceInterface
      * @param mixed $user The user instance
      * @param string $code The OTP code to verify
      * @param string|null $deviceId Optional device identifier
-     * @return array Result with success status
+     * @return void
+     * @throws \Redoy\AuthMaster\Exceptions\AuthException
      */
-    public function verify($user, string $code, ?string $deviceId = null): array;
+    public function verify($user, string $code, ?string $deviceId = null): void;
 
     /**
      * Check if 2FA is required for a user.

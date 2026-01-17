@@ -43,11 +43,11 @@ class TwoFactorService implements TwoFactorServiceInterface
         Cache::put($key, now()->timestamp + $delay, $delay);
     }
 
-    public function generateAndSend($user, ?string $deviceId = null): array
+    public function generateAndSend($user, ?string $deviceId = null): void
     {
         $delay = $this->checkResendDelay($user->id);
         if ($delay) {
-            return ['success' => false, 'message' => "Please wait {$delay} seconds before requesting a new OTP"];
+            throw new \Redoy\AuthMaster\Exceptions\AuthException("Please wait {$delay} seconds before requesting a new OTP", 429);
         }
 
         $length = config('authmaster.otp.length', 6);
@@ -65,26 +65,32 @@ class TwoFactorService implements TwoFactorServiceInterface
         } else {
             (new SendOtpJob($user, $code))->handle();
         }
-
-        return ['success' => true];
     }
 
-    public function verify($user, string $code, ?string $deviceId = null): array
+    /**
+     * Verify a 2FA OTP code.
+     *
+     * @param mixed $user The user instance
+     * @param string $code The OTP code to verify
+     * @param string|null $deviceId Optional device identifier
+     * @return void
+     * @throws \Redoy\AuthMaster\Exceptions\AuthException
+     */
+    public function verify($user, string $code, ?string $deviceId = null): void
     {
         $device = $deviceId ?? 'global';
         $key = $this->cacheKey($user->id, $device);
         $cached = Cache::get($key);
 
         if (!$cached) {
-            return ['success' => false, 'message' => 'Code expired or not found'];
+            throw new \Redoy\AuthMaster\Exceptions\AuthException('Code expired or not found', 422);
         }
 
         if (!hash_equals((string) $cached, (string) $code)) {
-            return ['success' => false, 'message' => 'Invalid code'];
+            throw new \Redoy\AuthMaster\Exceptions\AuthException('Invalid code', 422);
         }
 
         Cache::forget($key);
-        return ['success' => true];
     }
 
     public function isTwoFactorRequiredFor($user): bool

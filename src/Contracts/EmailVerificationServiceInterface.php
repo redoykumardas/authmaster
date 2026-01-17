@@ -38,7 +38,8 @@ interface EmailVerificationServiceInterface
      * Store pending registration data.
      *
      * @param array $data Registration data
-     * @return array Result with success status
+     * @return array Result message and optional dev info
+     * @throws \Redoy\AuthMaster\Exceptions\AuthException
      */
     public function storePendingRegistration(array $data): array;
 
@@ -47,7 +48,8 @@ interface EmailVerificationServiceInterface
      *
      * @param string $email The email address
      * @param string $code The OTP code
-     * @return array Result with user if successful
+     * @return array Result with user and message
+     * @throws \Redoy\AuthMaster\Exceptions\VerificationFailedException
      */
     public function verifyPendingRegistration(string $email, string $code): array;
 
@@ -55,7 +57,8 @@ interface EmailVerificationServiceInterface
      * Verify pending registration with link token.
      *
      * @param string $token The verification token
-     * @return array Result with user if successful
+     * @return array Result with user and message
+     * @throws \Redoy\AuthMaster\Exceptions\VerificationFailedException
      */
     public function verifyPendingLink(string $token): array;
 
@@ -63,7 +66,8 @@ interface EmailVerificationServiceInterface
      * Resend OTP for pending registration.
      *
      * @param string $email The email address
-     * @return array Result with success status
+     * @return array Result message
+     * @throws \Redoy\AuthMaster\Exceptions\AuthException
      */
     public function resendPendingOtp(string $email): array;
 

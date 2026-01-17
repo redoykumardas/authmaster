@@ -18,6 +18,7 @@ readonly class AuthResult implements Responsable
         public ?string $devVerificationUrl = null,
         public ?string $devToken = null,
         public int $status = 200,
+        public ?array $data = null,
     ) {
     }
 
@@ -55,6 +56,10 @@ readonly class AuthResult implements Responsable
         if ($this->devVerificationUrl && !app()->isProduction()) {
             $data['dev_verification_url'] = $this->devVerificationUrl;
             $data['dev_token'] = $this->devToken;
+        }
+
+        if ($this->data) {
+            $data = array_merge($data, $this->data);
         }
 
         return $data;

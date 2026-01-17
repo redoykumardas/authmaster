@@ -31,9 +31,7 @@ class RegistrationService implements RegistrationServiceInterface
     public function register(RegisterData $data): AuthResult
     {
         // Enforce device-based registration limit
-        if (!$this->securityService->allowRegistrationAttempt($data->ipAddress, $data->deviceId)) {
-            throw new TooManyAttemptsException('Too many registration attempts from this device. Please try again later.');
-        }
+        $this->securityService->allowRegistrationAttempt($data->ipAddress, $data->deviceId);
 
         $this->securityService->recordRegistrationAttempt($data->ipAddress, $data->deviceId);
 
@@ -57,10 +55,6 @@ class RegistrationService implements RegistrationServiceInterface
             'ip_address' => $data->ipAddress,
             'user_agent' => $data->userAgent,
         ]);
-
-        if (!$result['success']) {
-            throw new AuthException($result['message'] ?? 'Registration failed', 422);
-        }
 
         return new AuthResult(
             user: null,
@@ -114,27 +108,23 @@ class RegistrationService implements RegistrationServiceInterface
         // Only pending registration is supported if verification is required
         $result = $this->emailVerification->verifyPendingRegistration($data->email, $data->code);
 
-        if ($result['success']) {
-            $user = $result['user'];
-            Auth::login($user);
+        $user = $result['user'];
+        Auth::login($user);
 
-            $tokenResult = $this->authManager->finalizeLoginFromData(
-                $user,
-                $result['device_id'] ?? $data->deviceId,
-                $result['device_name'] ?? $data->deviceName,
-                $result['ip_address'] ?? $data->ipAddress,
-                $result['user_agent'] ?? $data->userAgent
-            );
+        $tokenResult = $this->authManager->finalizeLoginFromData(
+            $user,
+            $result['device_id'] ?? $data->deviceId,
+            $result['device_name'] ?? $data->deviceName,
+            $result['ip_address'] ?? $data->ipAddress,
+            $result['user_agent'] ?? $data->userAgent
+        );
 
-            return new AuthResult(
-                user: $user,
-                token: $tokenResult->token ?? null,
-                message: $result['message'],
-                status: 201,
-            );
-        }
-
-        throw new VerificationFailedException($result['message']);
+        return new AuthResult(
+            user: $user,
+            token: $tokenResult->token ?? null,
+            message: $result['message'],
+            status: 201,
+        );
     }
 
     protected function verifyLink(VerifyEmailData $data): AuthResult
@@ -142,27 +132,23 @@ class RegistrationService implements RegistrationServiceInterface
         // Only pending flow is supported for registration verification
         $result = $this->emailVerification->verifyPendingLink($data->token);
 
-        if ($result['success']) {
-            $user = $result['user'];
-            Auth::login($user);
+        $user = $result['user'];
+        Auth::login($user);
 
-            $tokenResult = $this->authManager->finalizeLoginFromData(
-                $user,
-                $result['device_id'] ?? $data->deviceId,
-                $result['device_name'] ?? $data->deviceName,
-                $result['ip_address'] ?? $data->ipAddress,
-                $result['user_agent'] ?? $data->userAgent
-            );
+        $tokenResult = $this->authManager->finalizeLoginFromData(
+            $user,
+            $result['device_id'] ?? $data->deviceId,
+            $result['device_name'] ?? $data->deviceName,
+            $result['ip_address'] ?? $data->ipAddress,
+            $result['user_agent'] ?? $data->userAgent
+        );
 
-            return new AuthResult(
-                user: $user,
-                token: $tokenResult->token ?? null,
-                message: $result['message'],
-                status: 201,
-            );
-        }
-
-        throw new VerificationFailedException($result['message']);
+        return new AuthResult(
+            user: $user,
+            token: $tokenResult->token ?? null,
+            message: $result['message'],
+            status: 201,
+        );
     }
 
 }

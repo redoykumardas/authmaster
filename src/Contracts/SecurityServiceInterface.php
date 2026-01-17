@@ -6,8 +6,10 @@ interface SecurityServiceInterface
 {
     /**
      * Check if a login attempt should be allowed.
+     *
+     * @throws \Redoy\AuthMaster\Exceptions\TooManyAttemptsException
      */
-    public function allowLoginAttempt(?string $email, string $ip, ?string $deviceId = null): bool;
+    public function allowLoginAttempt(?string $email, string $ip, ?string $deviceId = null): void;
 
     /**
      * Record a failed login attempt.
@@ -21,8 +23,10 @@ interface SecurityServiceInterface
 
     /**
      * Check if registration attempt is allowed from this device/IP.
+     *
+     * @throws \Redoy\AuthMaster\Exceptions\TooManyAttemptsException
      */
-    public function allowRegistrationAttempt(string $ip, ?string $deviceId = null): bool;
+    public function allowRegistrationAttempt(string $ip, ?string $deviceId = null): void;
 
     /**
      * Record a registration attempt.

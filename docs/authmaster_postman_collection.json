@@ -269,7 +269,7 @@
                     }
                 },
                 {
-                    "name": "Logout",
+                    "name": "Logout (Current Device)",
                     "request": {
                         "method": "POST",
                         "header": [
@@ -296,7 +296,7 @@
                     }
                 },
                 {
-                    "name": "Resend Verification",
+                    "name": "Logout (All Devices)",
                     "request": {
                         "method": "POST",
                         "header": [
@@ -310,16 +310,17 @@
                             }
                         ],
                         "url": {
-                            "raw": "{{base_url}}/auth/resend-verification",
+                            "raw": "{{base_url}}/auth/logout/all",
                             "host": [
                                 "{{base_url}}"
                             ],
                             "path": [
                                 "auth",
-                                "resend-verification"
+                                "logout",
+                                "all"
                             ]
                         },
-                        "description": "Resend verification email to authenticated user (if not already verified)."
+                        "description": "Invalidate ALL sessions/tokens for the user."
                     }
                 }
             ]
@@ -390,6 +391,131 @@
                         },
                         "description": "Change password for logged-in user."
                     }
+                },
+                {
+                    "name": "Get Devices",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/auth/devices",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "devices"
+                            ]
+                        },
+                        "description": "Get all active device sessions."
+                    }
+                },
+                {
+                    "name": "Remove Device",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/auth/devices/:deviceId",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "devices",
+                                ":deviceId"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "deviceId",
+                                    "value": "DEVICE_ID_FROM_LIST"
+                                }
+                            ]
+                        },
+                        "description": "Invalidate a specific device session."
+                    }
+                },
+                {
+                    "name": "Send 2FA OTP",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/auth/2fa/send",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "2fa",
+                                "send"
+                            ]
+                        },
+                        "description": "Request a 2FA OTP for the authenticated user."
+                    }
+                },
+                {
+                    "name": "Verify 2FA OTP",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"code\": \"123456\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/auth/2fa/verify",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "2fa",
+                                "verify"
+                            ]
+                        },
+                        "description": "Verify a 2FA OTP code."
+                    }
                 }
             ]
         },
@@ -458,6 +584,72 @@
                             ]
                         },
                         "description": "Reset password using token."
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Social Authentication",
+            "item": [
+                {
+                    "name": "Social Redirect",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/auth/social/:provider",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "social",
+                                ":provider"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "provider",
+                                    "value": "google"
+                                }
+                            ]
+                        },
+                        "description": "Initiate social login. Returns a redirect URL."
+                    }
+                },
+                {
+                    "name": "Social Callback",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/auth/social/:provider/callback",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "social",
+                                ":provider",
+                                "callback"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "provider",
+                                    "value": "google"
+                                }
+                            ]
+                        },
+                        "description": "Handle the social provider callback."
                     }
                 }
             ]

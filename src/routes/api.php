@@ -30,5 +30,7 @@ Route::prefix('auth')->group(function () {
         Route::patch('profile', [AuthController::class, 'updateProfile']);
         Route::post('password/change', [AuthController::class, 'changePassword']);
         Route::post('2fa/send', [AuthController::class, 'send2fa']);
+        Route::get('devices', [AuthController::class, 'devices']);
+        Route::delete('devices/{deviceId}', [AuthController::class, 'removeDevice']);
     });
 });

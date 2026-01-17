@@ -8,15 +8,17 @@ interface PasswordServiceInterface
      * Send a password reset link to the user's email.
      *
      * @param string $email The user's email address
-     * @return array Result with success status and optional message
+     * @return void
+     * @throws \Redoy\AuthMaster\Exceptions\AuthException
      */
-    public function sendResetLink(string $email): array;
+    public function sendResetLink(string $email): void;
 
     /**
      * Reset the user's password.
      *
      * @param array $payload Contains email, password, and token
-     * @return array Result with success status and optional message
+     * @return void
+     * @throws \Redoy\AuthMaster\Exceptions\AuthException
      */
-    public function resetPassword(array $payload): array;
+    public function resetPassword(array $payload): void;
 }

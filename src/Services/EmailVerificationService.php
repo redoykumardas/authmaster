@@ -76,8 +76,6 @@ class EmailVerificationService implements EmailVerificationServiceInterface
         $email = $data['email'];
         $ttl = config('authmaster.registration.verification_expires', 3600);
 
-        // Check previously handled by RegisterRequest validation
-
         $method = $this->getVerificationMethod();
         $pendingData = [
             'name' => $data['name'],
@@ -101,16 +99,16 @@ class EmailVerificationService implements EmailVerificationServiceInterface
 
             $tempUser = (object) ['name' => $data['name'], 'email' => $email];
             if (config('authmaster.otp.use_queue', true)) {
-                SendOtpJob::dispatch($tempUser, $code);
+                \Redoy\AuthMaster\Jobs\SendOtpJob::dispatch($tempUser, $code);
             } else {
-                SendOtpJob::dispatchSync($tempUser, $code);
+                \Redoy\AuthMaster\Jobs\SendOtpJob::dispatchSync($tempUser, $code);
             }
 
-            return ['success' => true, 'message' => 'Verification code sent to your email'];
+            return ['message' => 'Verification code sent to your email'];
         }
 
         if ($method === 'link') {
-            $token = Str::random(64);
+            $token = \Illuminate\Support\Str::random(64);
             $devToken = config('authmaster.registration.dev_token');
             if ($devToken && !app()->isProduction()) {
                 $token = $devToken;
@@ -125,12 +123,12 @@ class EmailVerificationService implements EmailVerificationServiceInterface
 
             $tempUser = (object) ['name' => $data['name'], 'email' => $email];
             if (config('authmaster.otp.use_queue', true)) {
-                SendVerificationLinkJob::dispatch($tempUser, $verificationUrl);
+                \Redoy\AuthMaster\Jobs\SendVerificationLinkJob::dispatch($tempUser, $verificationUrl);
             } else {
-                SendVerificationLinkJob::dispatchSync($tempUser, $verificationUrl);
+                \Redoy\AuthMaster\Jobs\SendVerificationLinkJob::dispatchSync($tempUser, $verificationUrl);
             }
 
-            $result = ['success' => true, 'message' => 'Verification link sent to your email'];
+            $result = ['message' => 'Verification link sent to your email'];
 
             if (!app()->isProduction()) {
                 $result['dev_verification_url'] = $verificationUrl;
@@ -140,7 +138,7 @@ class EmailVerificationService implements EmailVerificationServiceInterface
             return $result;
         }
 
-        return ['success' => false, 'message' => 'Invalid verification method'];
+        throw new \Redoy\AuthMaster\Exceptions\AuthException('Invalid verification method', 400);
     }
 
     public function verifyPendingRegistration(string $email, string $code): array
@@ -149,17 +147,17 @@ class EmailVerificationService implements EmailVerificationServiceInterface
         $pendingData = Cache::get($key);
 
         if (!$pendingData) {
-            return ['success' => false, 'message' => 'No pending registration found or it has expired'];
+            throw new \Redoy\AuthMaster\Exceptions\VerificationFailedException('No pending registration found or it has expired');
         }
 
         if (!hash_equals((string) $pendingData['otp'], (string) $code)) {
-            return ['success' => false, 'message' => 'Invalid verification code'];
+            throw new \Redoy\AuthMaster\Exceptions\VerificationFailedException('Invalid verification code');
         }
 
         // Race condition check: re-verify email hasn't been taken in the meantime
         if ($this->userModel::where('email', $email)->exists()) {
             Cache::forget($key);
-            return ['success' => false, 'message' => 'Email already registered'];
+            throw new \Redoy\AuthMaster\Exceptions\VerificationFailedException('Email already registered');
         }
 
         $user = $this->userModel::create([
@@ -173,7 +171,6 @@ class EmailVerificationService implements EmailVerificationServiceInterface
         Cache::forget($key);
 
         return [
-            'success' => true,
             'message' => 'Email verified and account created successfully',
             'user' => $user,
             'device_id' => $pendingData['device_id'] ?? null,
@@ -189,13 +186,13 @@ class EmailVerificationService implements EmailVerificationServiceInterface
         $pendingData = Cache::get($key);
 
         if (!$pendingData) {
-            return ['success' => false, 'message' => 'Verification link expired or invalid'];
+            throw new \Redoy\AuthMaster\Exceptions\VerificationFailedException('Verification link expired or invalid');
         }
 
         // Race condition check: re-verify email hasn't been taken in the meantime
         if ($this->userModel::where('email', $pendingData['email'])->exists()) {
             Cache::forget($key);
-            return ['success' => false, 'message' => 'Email already registered'];
+            throw new \Redoy\AuthMaster\Exceptions\VerificationFailedException('Email already registered');
         }
 
         $user = $this->userModel::create([
@@ -209,7 +206,6 @@ class EmailVerificationService implements EmailVerificationServiceInterface
         Cache::forget($key);
 
         return [
-            'success' => true,
             'message' => 'Email verified and account created successfully',
             'user' => $user,
             'device_id' => $pendingData['device_id'] ?? null,
@@ -223,14 +219,14 @@ class EmailVerificationService implements EmailVerificationServiceInterface
     {
         $delay = $this->checkResendDelay($email);
         if ($delay) {
-            return ['success' => false, 'message' => "Please wait {$delay} seconds before requesting a new code"];
+            throw new \Redoy\AuthMaster\Exceptions\AuthException("Please wait {$delay} seconds before requesting a new code", 429);
         }
 
         $key = $this->pendingRegistrationKey($email);
         $pendingData = Cache::get($key);
 
         if (!$pendingData) {
-            return ['success' => false, 'message' => 'No pending registration found'];
+            throw new \Redoy\AuthMaster\Exceptions\AuthException('No pending registration found', 404);
         }
 
         $code = $this->otpGenerator->generate(config('authmaster.otp.length', 6));
@@ -242,12 +238,12 @@ class EmailVerificationService implements EmailVerificationServiceInterface
 
         $tempUser = (object) ['name' => $pendingData['name'], 'email' => $email];
         if (config('authmaster.otp.use_queue', true)) {
-            SendOtpJob::dispatch($tempUser, $code);
+            \Redoy\AuthMaster\Jobs\SendOtpJob::dispatch($tempUser, $code);
         } else {
-            SendOtpJob::dispatchSync($tempUser, $code);
+            \Redoy\AuthMaster\Jobs\SendOtpJob::dispatchSync($tempUser, $code);
         }
 
-        return ['success' => true, 'message' => 'New verification code sent'];
+        return ['message' => 'New verification code sent'];
     }
 
 }

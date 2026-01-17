@@ -56,9 +56,7 @@ class AuthManager implements AuthManagerInterface
 
     public function loginWithData(LoginData $data): AuthResult
     {
-        if (!$this->securityService->allowLoginAttempt($data->email, $data->ipAddress, $data->deviceId)) {
-            throw new TooManyAttemptsException();
-        }
+        $this->securityService->allowLoginAttempt($data->email, $data->ipAddress, $data->deviceId);
 
         if (!Auth::attempt(['email' => $data->email, 'password' => $data->password])) {
             $this->securityService->recordFailedAttempt($data->email, $data->ipAddress, $data->deviceId);
@@ -151,62 +149,53 @@ class AuthManager implements AuthManagerInterface
 
     public function sendPasswordResetLink(array $payload): AuthResult
     {
-        $result = $this->passwordService->sendResetLink($payload['email']);
-        if (!$result['success']) {
-            throw new \Redoy\AuthMaster\Exceptions\AuthException($result['message'] ?? 'Failed to send reset email', 422);
-        }
+        $this->passwordService->sendResetLink($payload['email']);
         return new AuthResult(message: 'Reset email sent');
     }
 
 
     public function resetPasswordWithData(PasswordResetData $data): AuthResult
     {
-        $result = $this->passwordService->resetPassword([
+        $this->passwordService->resetPassword([
             'email' => $data->email,
             'password' => $data->password,
             'token' => $data->token,
         ]);
-
-        if (!$result['success']) {
-            throw new \Redoy\AuthMaster\Exceptions\AuthException($result['message'] ?? 'Failed to reset password', 422);
-        }
 
         return new AuthResult(message: 'Password reset');
     }
 
     public function sendTwoFactor($user): AuthResult
     {
-        $result = $this->twoFactorService->generateAndSend($user, null);
-        if (!$result['success']) {
-            throw new \Redoy\AuthMaster\Exceptions\AuthException($result['message'] ?? 'Failed to send OTP', 422);
-        }
+        $this->twoFactorService->generateAndSend($user, null);
         return new AuthResult(message: 'OTP sent');
     }
 
     public function verifyTwoFactor($user, $code): AuthResult
     {
-        $result = $this->twoFactorService->verify($user, $code);
-        if (!$result['success']) {
-            throw new \Redoy\AuthMaster\Exceptions\AuthException($result['message'] ?? 'Invalid code', 422);
-        }
+        $this->twoFactorService->verify($user, $code);
         return new AuthResult(message: 'OTP verified');
     }
 
     public function socialRedirect($provider): AuthResult
     {
-        $result = $this->socialLoginService->redirect($provider);
-        if (isset($result['redirect'])) {
-            return new AuthResult(user: $result['redirect'], message: 'Redirecting');
-        }
-        throw new \Redoy\AuthMaster\Exceptions\AuthException($result['message'] ?? 'Provider not available', 400);
+        $redirect = $this->socialLoginService->redirect($provider);
+        return new AuthResult(user: $redirect, message: 'Redirecting');
     }
 
     public function handleSocialCallback($provider, Request $request): AuthResult
     {
         $result = $this->socialLoginService->handleCallback($provider, $request);
-        if (!$result['success']) {
-            throw new \Redoy\AuthMaster\Exceptions\AuthException($result['message'] ?? 'Social login failed', 400);
-        }
-        return new AuthResult(user: $result['data'], message: 'Social login successful');
+        return new AuthResult(user: $result['user'], message: 'Social login successful');
+    }
+
+    public function getDevices($user)
+    {
+        return $this->deviceService->getActiveSessions($user);
+    }
+
+    public function removeDevice($user, string $deviceId): void
+    {
+        $this->deviceService->invalidateSession($user, $deviceId);
     }
 }
