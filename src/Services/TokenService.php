@@ -20,10 +20,10 @@ class TokenService implements TokenServiceInterface
         if (method_exists($user, 'createToken')) {
             $token = $user->createToken($deviceId ?? 'authmaster-token');
             // $token->accessToken for passport; for sanctum $token->plainTextToken
-            if (isset($token->accessToken)) {
-                $tokenString = $token->accessToken;
-            } elseif (isset($token->plainTextToken)) {
+            if (isset($token->plainTextToken)) {
                 $tokenString = $token->plainTextToken;
+            } elseif (isset($token->accessToken)) {
+                $tokenString = $token->accessToken;
             }
             // try to persist token id if possible
             $tokenId = $token->accessToken->id ?? ($token->accessToken->id ?? null);
