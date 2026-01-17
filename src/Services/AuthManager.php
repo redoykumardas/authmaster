@@ -68,10 +68,10 @@ class AuthManager implements AuthManagerInterface
         $user = Auth::user();
 
         if (config('authmaster.enable_2fa') && $this->twoFactorService->isTwoFactorRequiredFor($user)) {
-            $this->twoFactorService->generateAndSend($user, $data->deviceId);
+            $otpCode = $this->twoFactorService->generateAndSend($user, $data->deviceId);
             
             $tempToken = $this->generateTempToken($user);
-            throw new TwoFactorRequiredException('Two-factor authentication required', $tempToken);
+            throw new TwoFactorRequiredException('Two-factor authentication required', $tempToken, $otpCode);
         }
 
         $this->securityService->clearFailedAttempts($user->email);
@@ -200,7 +200,7 @@ class AuthManager implements AuthManagerInterface
         }
 
         // 2. Verify OTP
-        $this->twoFactorService->verify($user, $code);
+        $this->twoFactorService->verify($user, $code, $deviceId);
 
         // 3. Finalize Login
         $this->securityService->clearFailedAttempts($user->email);

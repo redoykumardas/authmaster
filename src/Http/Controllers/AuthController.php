@@ -4,6 +4,8 @@ namespace Redoy\AuthMaster\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Redoy\CoreModule\Facades\CoreResponse;
+use Redoy\CoreModule\Constants\ApiCodes;
 use Redoy\AuthMaster\Contracts\AuthManagerInterface;
 use Redoy\AuthMaster\Contracts\RegistrationServiceInterface;
 use Redoy\AuthMaster\DTOs\AuthResult;
@@ -30,18 +32,9 @@ class AuthController extends Controller
 
     public function login(LoginRequest $request)
     {
-        try {
-            return $this->authManager->loginWithData(
-                LoginData::fromRequest($request)
-            );
-        } catch (\Redoy\AuthMaster\Exceptions\TwoFactorRequiredException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'requires_2fa' => true,
-                'temp_token' => $e->tempToken
-            ], 403);
-        }
+        return $this->authManager->loginWithData(
+            LoginData::fromRequest($request)
+        );
     }
 
     public function register(RegisterRequest $request)

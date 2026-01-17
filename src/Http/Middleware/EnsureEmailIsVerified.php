@@ -5,6 +5,8 @@ namespace Redoy\AuthMaster\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Redoy\AuthMaster\Services\EmailVerificationService;
+use Redoy\CoreModule\Facades\CoreResponse;
+use Redoy\CoreModule\Constants\ApiCodes;
 
 class EnsureEmailIsVerified
 {
@@ -35,12 +37,14 @@ class EnsureEmailIsVerified
 
         // Check if email is verified
         if (!$this->emailVerification->isVerified($user)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Your email address is not verified.',
-                'email_verification_required' => true,
-                'email_verification_method' => $this->emailVerification->getVerificationMethod(),
-            ], 403);
+             return CoreResponse::errorResponse(
+                 [
+                    'email_verification_required' => true,
+                    'email_verification_method' => $this->emailVerification->getVerificationMethod(),
+                 ],
+                 ApiCodes::FORBIDDEN,
+                 'Your email address is not verified.'
+             );
         }
 
         return $next($request);

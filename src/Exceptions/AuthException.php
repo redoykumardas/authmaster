@@ -3,7 +3,9 @@
 namespace Redoy\AuthMaster\Exceptions;
 
 use Exception;
+
 use Illuminate\Http\JsonResponse;
+use Redoy\CoreModule\Facades\CoreResponse;
 
 class AuthException extends Exception
 {
@@ -30,12 +32,12 @@ class AuthException extends Exception
         return $this->errors;
     }
 
-    public function render(): JsonResponse
+    public function render()
     {
-        return response()->json([
-            'success' => false,
-            'message' => $this->getMessage(),
-            'errors' => $this->errors,
-        ], $this->statusCode);
+        return CoreResponse::errorResponse(
+            $this->errors,
+            $this->statusCode,
+            $this->getMessage()
+        );
     }
 }

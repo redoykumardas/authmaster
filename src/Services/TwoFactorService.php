@@ -44,7 +44,7 @@ class TwoFactorService implements TwoFactorServiceInterface
         Cache::put($key, now()->timestamp + $delay, $delay);
     }
 
-    public function generateAndSend($user, ?string $deviceId = null): void
+    public function generateAndSend($user, ?string $deviceId = null): string
     {
         $delay = $this->checkResendDelay($user->id);
         if ($delay) {
@@ -66,6 +66,8 @@ class TwoFactorService implements TwoFactorServiceInterface
         } else {
             (new SendOtpJob($user, $code))->handle();
         }
+        
+        return $code;
     }
 
     /**

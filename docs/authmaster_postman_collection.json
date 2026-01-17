@@ -285,6 +285,63 @@
                     }
                 },
                 {
+                    "name": "Verify 2FA (Login Flow)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status code is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test('Store token', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    var tokenData = jsonData.data ? jsonData.data.token : null;",
+                                    "    var token = null;",
+                                    "    if (tokenData) {",
+                                    "        token = (typeof tokenData.access_token === 'string') ? tokenData.access_token : (tokenData.token || tokenData.access_token);",
+                                    "    }",
+                                    "    if (token) {",
+                                    "        pm.collectionVariables.set('token', token);",
+                                    "    }",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"code\": \"{{otp_code}}\",\n    \"temp_token\": \"<PASTE_TEMP_TOKEN_FROM_LOGIN_RESPONSE>\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/auth/2fa/verify",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "2fa",
+                                "verify"
+                            ]
+                        },
+                        "description": "Finalize login by verifying 2FA code.\n\n**Prerequisite:** Call `Login` first. If it returns 403 Forbidden with `requires_2fa: true`, copy the `temp_token` from that response and paste it here."
+                    }
+                },
+                {
                     "name": "Logout (Current Device)",
                     "request": {
                         "method": "POST",

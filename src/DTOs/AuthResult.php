@@ -4,6 +4,7 @@ namespace Redoy\AuthMaster\DTOs;
 
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Support\Traits\Tappable;
+use Redoy\CoreModule\Facades\CoreResponse;
 
 readonly class AuthResult implements Responsable
 {
@@ -24,11 +25,11 @@ readonly class AuthResult implements Responsable
 
     public function toResponse($request)
     {
-        return response()->json([
-            'success' => true,
-            'message' => $this->message,
-            'data' => $this->toArray(),
-        ], $this->status);
+        return CoreResponse::successResponse(
+            $this->toArray(),
+            null,
+            $this->message
+        );
     }
 
     public function toArray(): array
