@@ -77,6 +77,27 @@ class SecurityFeaturesTest extends TestCase
     }
 
     /** @test */
+    public function test_re_registration_forbidden_while_otp_pending()
+    {
+        $service = app(EmailVerificationService::class);
+        $data = [
+            'name' => 'Test',
+            'email' => 'test_pending@example.com',
+            'password' => 'password',
+            'ip_address' => '127.0.0.1'
+        ];
+
+        // First request stores pending data
+        $service->storePendingRegistration($data);
+
+        // Trying to register again with same email while pending should fail
+        $this->expectException(\Redoy\AuthMaster\Exceptions\AuthException::class);
+        $this->expectExceptionMessage('Your email is in registration process, verify otp or wait some time and try again.');
+        
+        $service->storePendingRegistration($data);
+    }
+
+    /** @test */
     public function test_otp_is_queued_when_configured()
     {
         Bus::fake();
@@ -111,11 +132,6 @@ class SecurityFeaturesTest extends TestCase
         // Next attempt should be blocked
         $this->expectException(\Redoy\AuthMaster\Exceptions\TooManyAttemptsException::class);
         $security->allowLoginAttempt($email, $ip, $deviceId);
-
-        // But another device should NOT be blocked for the same email/IP (unless global limit hit)
-        // (This line won't be reached in this test because of expectException above, I might need to separate them if I want to test both)
-        // Actually I'll just keep the lockout test and maybe add another test for the "different_device" case if I'm being thorough.
-        // But for now let's just make it pass.
     }
 
     /** @test */
