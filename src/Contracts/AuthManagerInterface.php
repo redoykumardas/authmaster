@@ -88,13 +88,6 @@ interface AuthManagerInterface
      */
     public function resetPasswordWithData(\Redoy\AuthMaster\DTOs\PasswordResetData $data): AuthResult;
 
-    /**
-     * Send 2FA code to user.
-     *
-     * @param mixed $user The user instance
-     * @return AuthResult Result with success status
-     */
-    public function sendTwoFactor($user): AuthResult;
 
     /**
      * Verify 2FA code.
@@ -118,14 +111,6 @@ interface AuthManagerInterface
      */
     public function verifyTwoFactorLogin(string $tempToken, string $code, string $deviceId, ?string $deviceName, string $ipAddress, ?string $userAgent): AuthResult;
 
-    /**
-     * Resend 2FA code during login process.
-     *
-     * @param string $tempToken The temporary session token
-     * @param string $deviceId The device identifier
-     * @return AuthResult Result with new temp token and dev OTP
-     */
-    public function resendTwoFactorLogin(string $tempToken, string $deviceId): AuthResult;
 
     /**
      * Get social login redirect URL.
