@@ -56,7 +56,7 @@ return [
 
     'registration' => [
         // Email verification method: 'none', 'otp', or 'link'
-        'email_verification' => env('AUTHMASTER_EMAIL_VERIFICATION', 'otp'),
+        'email_verification' => env('AUTHMASTER_EMAIL_VERIFICATION', 'link'),
 
         // URL for email verification link (only used when email_verification = 'link')
         'verification_url' => env('AUTHMASTER_VERIFICATION_URL', '/verify-email'),

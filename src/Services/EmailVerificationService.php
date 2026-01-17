@@ -102,6 +102,11 @@ class EmailVerificationService implements EmailVerificationServiceInterface
         return "authmaster_pending_reg:" . md5($email);
     }
 
+    protected function verificationAttemptsKey(string $email): string
+    {
+        return "authmaster_otp_attempts:" . md5($email);
+    }
+
     // =========================================================================
     // 3. Resend & Cooldown Logic
     // =========================================================================
@@ -167,8 +172,9 @@ class EmailVerificationService implements EmailVerificationServiceInterface
         $ttl = $this->config->get('authmaster.registration.verification_expires', 3600);
         $this->cache->put($key, $pendingData, $ttl);
         
-        // Step 4: Reset the cooldown and dispatch the job
+        // Step 4: Reset the cooldown, clear previous attempts, and dispatch the job
         $this->setResendDelay($email);
+        $this->clearVerificationAttempts($email);
 
         $tempUser = (object) ['name' => $pendingData['name'], 'email' => $email];
         $this->dispatchOtpJob($tempUser, $code);
@@ -198,6 +204,9 @@ class EmailVerificationService implements EmailVerificationServiceInterface
         
         // Step 2: Prepare the data payload to be cached
         $pendingData = $this->preparePendingData($method);
+
+        // Clear any previous attempts for this new registration
+        $this->clearVerificationAttempts($email);
 
         // Step 3: Handle the specific verification method (OTP or Link)
         return match ($method) {
@@ -317,7 +326,7 @@ class EmailVerificationService implements EmailVerificationServiceInterface
      * @throws VerificationFailedException
      */
     public function verifyPendingRegistration(string $email, string $code): array
-    {
+        {
         $key = $this->pendingRegistrationKey($email);
         $pendingData = $this->cache->get($key);
 
@@ -325,9 +334,16 @@ class EmailVerificationService implements EmailVerificationServiceInterface
             throw new VerificationFailedException('No pending registration found or it has expired');
         }
 
+        // Check if max attempts exceeded
+        $this->ensureNotTooManyAttempts($email);
+
         if (!hash_equals((string) $pendingData['otp'], (string) $code)) {
+            $this->incrementVerificationAttempts($email);
             throw new VerificationFailedException('Invalid verification code');
         }
+
+        // Clear attempts on success
+        $this->clearVerificationAttempts($email);
 
         return $this->finalizeRegistration($pendingData, $key);
     }
@@ -416,5 +432,34 @@ class EmailVerificationService implements EmailVerificationServiceInterface
         } else {
             $this->dispatcher->dispatchSync($job);
         }
+    }
+
+    // =========================================================================
+    // 7. Max Attempts Logic
+    // =========================================================================
+
+    protected function ensureNotTooManyAttempts(string $email): void
+    {
+        $max = $this->config->get('authmaster.otp.max_attempts', 3);
+        $key = $this->verificationAttemptsKey($email);
+        $attempts = $this->cache->get($key, 0);
+
+        if ($attempts >= $max) {
+            throw new VerificationFailedException('Too many invalid attempts. Please request a new code.');
+        }
+    }
+
+    protected function incrementVerificationAttempts(string $email): void
+    {
+        $key = $this->verificationAttemptsKey($email);
+        $ttl = $this->config->get('authmaster.registration.verification_expires', 3600);
+        
+        $attempts = (int) $this->cache->get($key, 0) + 1;
+        $this->cache->put($key, $attempts, $ttl);
+    }
+
+    protected function clearVerificationAttempts(string $email): void
+    {
+        $this->cache->forget($this->verificationAttemptsKey($email));
     }
 }
