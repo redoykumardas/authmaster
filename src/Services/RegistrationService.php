@@ -115,7 +115,7 @@ class RegistrationService implements RegistrationServiceInterface
     protected function verifyLink(VerifyEmailData $data): AuthResult
     {
         // Only pending flow is supported for registration verification
-        $result = $this->emailVerification->verifyPendingLink($data->token);
+        $result = $this->emailVerification->verifyPendingLink($data->token, $data->ipAddress);
 
         return $this->authenticateAndRespond(
             $result['user'],

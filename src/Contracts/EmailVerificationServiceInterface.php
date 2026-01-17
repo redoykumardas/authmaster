@@ -59,7 +59,7 @@ interface EmailVerificationServiceInterface
      * @return array Result with user and message
      * @throws \Redoy\AuthMaster\Exceptions\VerificationFailedException
      */
-    public function verifyPendingLink(string $token): array;
+    public function verifyPendingLink(string $token, ?string $ipAddress = null): array;
 
     /**
      * Resend OTP for pending registration.

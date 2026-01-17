@@ -59,7 +59,9 @@ return [
         'email_verification' => env('AUTHMASTER_EMAIL_VERIFICATION', 'link'),
 
         // URL for email verification link (only used when email_verification = 'link')
-        'verification_url' => env('AUTHMASTER_VERIFICATION_URL', '/verify-email'),
+        // If you are using a frontend, set this to your frontend verification page.
+        // If testing via API directly, point this to the API endpoint: /api/auth/verify-email
+        'verification_url' => env('AUTHMASTER_VERIFICATION_URL', '/api/auth/verify-email'),
 
         // Verification token/OTP expiration in seconds
         'verification_expires' => env('AUTHMASTER_VERIFICATION_EXPIRES', 3600), // 1 hour

@@ -107,6 +107,11 @@ class EmailVerificationService implements EmailVerificationServiceInterface
         return "authmaster_otp_attempts:" . md5($email);
     }
 
+    protected function ipAttemptsKey(string $ip): string
+    {
+        return "authmaster_ip_attempts:" . md5($ip);
+    }
+
     // =========================================================================
     // 3. Resend & Cooldown Logic
     // =========================================================================
@@ -295,9 +300,14 @@ class EmailVerificationService implements EmailVerificationServiceInterface
 
         $tokenKey = "authmaster_pending_token:{$token}";
         $this->cache->put($tokenKey, $pendingData, $ttl);
+        
+        // Also store by email key so ensureNoPendingRegistration works
+        $emailKey = $this->pendingRegistrationKey($email);
+        $this->cache->put($emailKey, $pendingData, $ttl);
+        
         $this->setResendDelay($email);
 
-        $baseUrl = $this->config->get('authmaster.registration.verification_url', '/verify-email');
+        $baseUrl = $this->config->get('authmaster.registration.verification_url', '/api/auth/verify-email');
         $verificationUrl = url($baseUrl) . '?token=' . $token;
 
         $tempUser = (object) ['name' => $this->registerData->name, 'email' => $email];
@@ -352,16 +362,30 @@ class EmailVerificationService implements EmailVerificationServiceInterface
      * Compute final registration by verifying the Link Token.
      *
      * @param string $token
+     * @param string|null $ipAddress
      * @return array
      * @throws VerificationFailedException
      */
-    public function verifyPendingLink(string $token): array
+    public function verifyPendingLink(string $token, ?string $ipAddress = null): array
     {
+        // Rate Limit Check by IP if provided
+        if ($ipAddress) {
+            $this->ensureIpNotBlocked($ipAddress);
+        }
+
         $key = "authmaster_pending_token:{$token}";
         $pendingData = $this->cache->get($key);
 
         if (!$pendingData) {
+            if ($ipAddress) {
+                $this->incrementIpAttempts($ipAddress);
+            }
             throw new VerificationFailedException('Verification link expired or invalid');
+        }
+
+        // Cleanup IP attempts on success (optional, but good for real users)
+        if ($ipAddress) {
+            $this->cache->forget($this->ipAttemptsKey($ipAddress));
         }
 
         return $this->finalizeRegistration($pendingData, $key);
@@ -395,6 +419,11 @@ class EmailVerificationService implements EmailVerificationServiceInterface
 
         // Step 4: Cleanup cache
         $this->cache->forget($cacheKey);
+        
+        // Also forget the main pending registration key to unblock the email
+        if (isset($pendingData['email'])) {
+            $this->cache->forget($this->pendingRegistrationKey($pendingData['email']));
+        }
 
         return [
             'message' => 'Email verified and account created successfully',
@@ -461,5 +490,24 @@ class EmailVerificationService implements EmailVerificationServiceInterface
     protected function clearVerificationAttempts(string $email): void
     {
         $this->cache->forget($this->verificationAttemptsKey($email));
+    }
+
+    protected function ensureIpNotBlocked(string $ip): void
+    {
+        $max = $this->config->get('authmaster.security.max_registration_attempts_per_device', 10);
+        $key = $this->ipAttemptsKey($ip);
+        $attempts = $this->cache->get($key, 0);
+
+        if ($attempts >= $max) {
+             throw new VerificationFailedException('Too many failed attempts. Please try again later.');
+        }
+    }
+
+    protected function incrementIpAttempts(string $ip): void
+    {
+        $key = $this->ipAttemptsKey($ip);
+        $ttl = 3600; // Block tracking for 1 hour
+        $attempts = (int) $this->cache->get($key, 0) + 1;
+        $this->cache->put($key, $attempts, $ttl);
     }
 }
