@@ -24,6 +24,11 @@
                                     "pm.test('Pending registration', function () {",
                                     "    var jsonData = pm.response.json();",
                                     "    pm.expect(jsonData.data.pending_registration).to.eql(true);",
+                                    "    ",
+                                    "    // Save dev tokens if returned",
+                                    "    if (jsonData.data.dev_token) {",
+                                    "        pm.collectionVariables.set('link_token', jsonData.data.dev_token);",
+                                    "    }",
                                     "});"
                                 ],
                                 "type": "text/javascript"
@@ -44,7 +49,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"name\": \"John Doe\",\n    \"email\": \"john@example.com\",\n    \"password\": \"password123\",\n    \"password_confirmation\": \"password123\"\n}"
+                            "raw": "{\n    \"name\": \"{{test_name}}\",\n    \"email\": \"{{test_email}}\",\n    \"password\": \"{{test_password}}\",\n    \"password_confirmation\": \"{{test_password}}\"\n}"
                         },
                         "url": {
                             "raw": "{{base_url}}/auth/register",
@@ -101,7 +106,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"email\": \"john@example.com\",\n    \"code\": \"123456\"\n}"
+                            "raw": "{\n    \"email\": \"{{test_email}}\",\n    \"code\": \"{{otp_code}}\"\n}"
                         },
                         "url": {
                             "raw": "{{base_url}}/auth/verify-email",
@@ -158,7 +163,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"token\": \"dev-verification-token\"\n}"
+                            "raw": "{\n    \"token\": \"{{link_token}}\"\n}"
                         },
                         "url": {
                             "raw": "{{base_url}}/auth/verify-email",
@@ -197,7 +202,7 @@
                             }
                         ],
                         "url": {
-                            "raw": "{{base_url}}/auth/verify-email?token=dev-verification-token",
+                            "raw": "{{base_url}}/auth/verify-email?token={{link_token}}",
                             "host": [
                                 "{{base_url}}"
                             ],
@@ -208,7 +213,7 @@
                             "query": [
                                 {
                                     "key": "token",
-                                    "value": "dev-verification-token"
+                                    "value": "{{link_token}}"
                                 }
                             ]
                         },
@@ -253,7 +258,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"email\": \"john@example.com\",\n    \"password\": \"password123\"\n}"
+                            "raw": "{\n    \"email\": \"{{test_email}}\",\n    \"password\": \"{{test_password}}\"\n}"
                         },
                         "url": {
                             "raw": "{{base_url}}/auth/login",
@@ -376,7 +381,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"current_password\": \"password123\",\n    \"password\": \"newpassword123\",\n    \"password_confirmation\": \"newpassword123\"\n}"
+                            "raw": "{\n    \"current_password\": \"{{test_password}}\",\n    \"password\": \"newpassword123\",\n    \"password_confirmation\": \"newpassword123\"\n}"
                         },
                         "url": {
                             "raw": "{{base_url}}/auth/password/change",
@@ -446,7 +451,7 @@
                             "variable": [
                                 {
                                     "key": "deviceId",
-                                    "value": "DEVICE_ID_FROM_LIST"
+                                    "value": "{{device_id}}"
                                 }
                             ]
                         },
@@ -501,7 +506,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"code\": \"123456\"\n}"
+                            "raw": "{\n    \"code\": \"{{otp_code}}\"\n}"
                         },
                         "url": {
                             "raw": "{{base_url}}/auth/2fa/verify",
@@ -538,7 +543,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"email\": \"john@example.com\"\n}"
+                            "raw": "{\n    \"email\": \"{{test_email}}\"\n}"
                         },
                         "url": {
                             "raw": "{{base_url}}/auth/password/email",
@@ -570,7 +575,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"token\": \"TOKEN_FROM_EMAIL\",\n    \"email\": \"john@example.com\",\n    \"password\": \"newpass\",\n    \"password_confirmation\": \"newpass\"\n}"
+                            "raw": "{\n    \"token\": \"{{link_token}}\",\n    \"email\": \"{{test_email}}\",\n    \"password\": \"newpass\",\n    \"password_confirmation\": \"newpass\"\n}"
                         },
                         "url": {
                             "raw": "{{base_url}}/auth/password/reset",
@@ -662,6 +667,30 @@
         },
         {
             "key": "token",
+            "value": ""
+        },
+        {
+            "key": "test_name",
+            "value": "John Doe"
+        },
+        {
+            "key": "test_email",
+            "value": "john@example.com"
+        },
+        {
+            "key": "test_password",
+            "value": "password123"
+        },
+        {
+            "key": "otp_code",
+            "value": "123456"
+        },
+        {
+            "key": "link_token",
+            "value": "dev-verification-token"
+        },
+        {
+            "key": "device_id",
             "value": ""
         }
     ]
