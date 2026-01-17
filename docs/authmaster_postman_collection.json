@@ -239,6 +239,7 @@
                             "listen": "test",
                             "script": {
                                 "exec": [
+                                    "// Handle successful login",
                                     "pm.test('Store token', function () {",
                                     "    var jsonData = pm.response.json();",
                                     "    var tokenData = jsonData.data ? jsonData.data.token : null;",
@@ -248,6 +249,27 @@
                                     "    }",
                                     "    if (token) {",
                                     "        pm.collectionVariables.set('token', token);",
+                                    "    }",
+                                    "});",
+                                    "",
+                                    "// Handle 2FA temp token",
+                                    "pm.test('Handle 2FA temp token', function () {",
+                                    "    const response = pm.response.json();",
+                                    "",
+                                    "    if (!response.data) {",
+                                    "        console.log('No data object found');",
+                                    "        return;",
+                                    "    }",
+                                    "",
+                                    "    if (response.data.requires_2fa === true) {",
+                                    "        const tempToken = response.data.temp_token;",
+                                    "",
+                                    "        if (typeof tempToken === 'string') {",
+                                    "            pm.collectionVariables.set('temp_token', tempToken);",
+                                    "            console.log('Temp token stored successfully');",
+                                    "        } else {",
+                                    "            console.warn('temp_token is missing or invalid');",
+                                    "        }",
                                     "    }",
                                     "});"
                                 ],
@@ -325,7 +347,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"code\": \"{{otp_code}}\",\n    \"temp_token\": \"<PASTE_TEMP_TOKEN_FROM_LOGIN_RESPONSE>\"\n}"
+                            "raw": "{\n    \"code\": \"{{otp_code}}\",\n    \"temp_token\": \"{{temp_token}}\"\n}"
                         },
                         "url": {
                             "raw": "{{base_url}}/auth/2fa/verify",
@@ -338,7 +360,39 @@
                                 "verify"
                             ]
                         },
-                        "description": "Finalize login by verifying 2FA code.\n\n**Prerequisite:** Call `Login` first. If it returns 403 Forbidden with `requires_2fa: true`, copy the `temp_token` from that response and paste it here."
+                        "description": "Finalize login by verifying 2FA code."
+                    }
+                },
+                {
+                    "name": "Resend OTP (Login Flow)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"temp_token\": \"{{temp_token}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/auth/2fa/send",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "2fa",
+                                "send"
+                            ]
+                        },
+                        "description": "Resend the 2FA code if it has expired during the login process."
                     }
                 },
                 {
@@ -538,8 +592,16 @@
                             {
                                 "key": "Authorization",
                                 "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
                             }
                         ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"temp_token\": \"{{temp_token}}\"\n}"
+                        },
                         "url": {
                             "raw": "{{base_url}}/auth/2fa/send",
                             "host": [
@@ -551,7 +613,7 @@
                                 "send"
                             ]
                         },
-                        "description": "Request a 2FA OTP for the authenticated user."
+                        "description": "Request a 2FA OTP.\n\n**Use Cases:**\n1. **Logged-in User:** Send request with Bearer token (no body needed).\n2. **Login Process:** Send request with `temp_token` in body to resend OTP if expired."
                     }
                 },
                 {

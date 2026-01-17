@@ -171,8 +171,11 @@ class AuthManager implements AuthManagerInterface
 
     public function sendTwoFactor($user): AuthResult
     {
-        $this->twoFactorService->generateAndSend($user, null);
-        return new AuthResult(message: 'OTP sent');
+        $otpCode = $this->twoFactorService->generateAndSend($user, null);
+        return new AuthResult(
+            message: 'OTP sent',
+            data: !app()->isProduction() ? ['dev_otp' => $otpCode] : []
+        );
     }
 
     public function verifyTwoFactor($user, $code): AuthResult
@@ -211,6 +214,35 @@ class AuthManager implements AuthManagerInterface
              $deviceName,
              $ipAddress,
              $userAgent
+        );
+    }
+
+    public function resendTwoFactorLogin(string $tempToken, string $deviceId): AuthResult
+    {
+        // 1. Decrypt token to find user
+        try {
+            $payload = json_decode(Crypt::decryptString($tempToken), true);
+        } catch (\Exception $e) {
+            throw new AuthException('Invalid or expired session token', 401);
+        }
+
+        if (!isset($payload['id']) || !isset($payload['expires']) || now()->timestamp > $payload['expires']) {
+            throw new AuthException('Session expired, please login again', 401);
+        }
+
+        $user = $this->userModel::find($payload['id']);
+        if (!$user) {
+            throw new AuthException('User not found', 404);
+        }
+
+        // 2. Generate and Send new OTP
+        $otpCode = $this->twoFactorService->generateAndSend($user, $deviceId);
+
+        // 3. Return (optionally with new temp token if we wanted to extend session, but keeping same is fine for now)
+        return new AuthResult(
+            message: 'OTP resent',
+            devToken: $tempToken, 
+            data: !app()->isProduction() ? ['dev_otp' => $otpCode] : []
         );
     }
 

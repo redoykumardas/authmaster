@@ -97,7 +97,27 @@ class AuthController extends Controller
 
     public function send2fa(Request $request)
     {
-        return $this->authManager->sendTwoFactor($request->user());
+        // 1. If temp_token is present, we are resending for a pending login
+        if ($request->filled('temp_token')) {
+             $deviceId = $request->header('device_id')
+            ?? $request->header('X-Device-Id')
+            ?? $request->header('Device-Id')
+            ?? hash('sha256', (string) $request->ip() . '|' . (string) $request->userAgent());
+
+            return $this->authManager->resendTwoFactorLogin(
+                $request->input('temp_token'),
+                $deviceId
+            );
+        }
+
+        // 2. Check if user is authenticated via Sanctum/Guard
+        $user = $request->user();
+        
+        if ($user) {
+             return $this->authManager->sendTwoFactor($user);
+        }
+
+        return CoreResponse::errorResponse([], ApiCodes::UNAUTHORIZED, 'Unauthenticated');
     }
 
     public function verify2fa(Verify2faRequest $request)
