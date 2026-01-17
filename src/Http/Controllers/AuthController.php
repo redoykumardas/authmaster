@@ -37,9 +37,7 @@ class AuthController extends Controller
 
     public function register(RegisterRequest $request)
     {
-        return $this->registrationService->register(
-            RegisterData::fromRequest($request)
-        );
+        return $this->registrationService->register();
     }
 
     public function verifyEmail(VerifyEmailRequest $request)

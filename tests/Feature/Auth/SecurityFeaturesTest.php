@@ -56,19 +56,28 @@ class SecurityFeaturesTest extends TestCase
         return $user;
     }
 
+    private function createRegistrationService(string $email = 'test@example.com'): EmailVerificationService
+    {
+        $data = new \Redoy\AuthMaster\DTOs\RegisterData(
+            name: 'Test',
+            email: $email,
+            password: 'password',
+            deviceId: 'dev_123',
+            deviceName: 'Test Device',
+            ipAddress: '127.0.0.1',
+            userAgent: null
+        );
+
+        return app()->makeWith(EmailVerificationService::class, ['registerData' => $data]);
+    }
+
     /** @test */
     public function test_otp_resend_cooldown_is_enforced()
     {
-        $service = app(EmailVerificationService::class);
-        $data = [
-            'name' => 'Test',
-            'email' => 'test@example.com',
-            'password' => 'password',
-            'ip_address' => '127.0.0.1'
-        ];
+        $service = $this->createRegistrationService();
 
         // First request should succeed
-        $service->storePendingRegistration($data);
+        $service->storePendingRegistration();
 
         // Second immediate request (via resend) should fail
         $this->expectException(\Redoy\AuthMaster\Exceptions\AuthException::class);
@@ -79,37 +88,25 @@ class SecurityFeaturesTest extends TestCase
     /** @test */
     public function test_re_registration_forbidden_while_otp_pending()
     {
-        $service = app(EmailVerificationService::class);
-        $data = [
-            'name' => 'Test',
-            'email' => 'test_pending@example.com',
-            'password' => 'password',
-            'ip_address' => '127.0.0.1'
-        ];
+        $service = $this->createRegistrationService('test_pending@example.com');
 
         // First request stores pending data
-        $service->storePendingRegistration($data);
+        $service->storePendingRegistration();
 
         // Trying to register again with same email while pending should fail
         $this->expectException(\Redoy\AuthMaster\Exceptions\AuthException::class);
         $this->expectExceptionMessage('Your email is in registration process, verify otp or wait some time and try again.');
         
-        $service->storePendingRegistration($data);
+        $service->storePendingRegistration();
     }
 
     /** @test */
     public function test_otp_is_queued_when_configured()
     {
         Bus::fake();
-        $service = app(EmailVerificationService::class);
-        $data = [
-            'name' => 'Test',
-            'email' => 'test@example.com',
-            'password' => 'password',
-            'ip_address' => '127.0.0.1'
-        ];
+        $service = $this->createRegistrationService();
 
-        $service->storePendingRegistration($data);
+        $service->storePendingRegistration();
 
         Bus::assertDispatched(SendOtpJob::class);
     }

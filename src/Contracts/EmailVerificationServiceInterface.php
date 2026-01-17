@@ -37,11 +37,10 @@ interface EmailVerificationServiceInterface
     /**
      * Store pending registration data.
      *
-     * @param array $data Registration data
      * @return array Result message and optional dev info
      * @throws \Redoy\AuthMaster\Exceptions\AuthException
      */
-    public function storePendingRegistration(array $data): array;
+    public function storePendingRegistration(): array;
 
     /**
      * Verify pending registration with OTP.

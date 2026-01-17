@@ -18,51 +18,45 @@ use Redoy\AuthMaster\Exceptions\VerificationFailedException;
 class RegistrationService implements RegistrationServiceInterface
 {
     protected $userModel;
-
+    
     public function __construct(
         protected AuthManagerInterface $authManager,
         protected EmailVerificationServiceInterface $emailVerification,
         protected SecurityServiceInterface $securityService,
-        protected Hasher $hasher
+        protected Hasher $hasher,
+        protected ?RegisterData $registerData = null
     ) {
         $this->userModel = config('auth.providers.users.model');
     }
 
-    public function register(RegisterData $data): AuthResult
+    public function register(): AuthResult
     {
+
         // Enforce device-based registration limit
-        $this->securityService->allowRegistrationAttempt($data->ipAddress, $data->deviceId);
+        $this->securityService->allowRegistrationAttempt();
 
-        $this->securityService->recordRegistrationAttempt($data->ipAddress, $data->deviceId);
+        $this->securityService->recordRegistrationAttempt();
 
-        return $this->handleRegistration($data);
+        return $this->handleRegistration();
     }
 
     /**
      * Determine the registration flow and handle accordingly.
      */
-    protected function handleRegistration(RegisterData $data): AuthResult
+    protected function handleRegistration(): AuthResult
     {
         // If verification is required, use pending registration flow (stores in cache/pending table)
         if ($this->emailVerification->isVerificationRequired()) {
-            return $this->handlePendingRegistration($data);
+            return $this->handlePendingRegistration();
         }
 
         // No verification required: create user immediately
-        return $this->handleStandardRegistration($data);
+        return $this->handleStandardRegistration();
     }
 
-    protected function handlePendingRegistration(RegisterData $data): AuthResult
+    protected function handlePendingRegistration(): AuthResult
     {
-        $result = $this->emailVerification->storePendingRegistration([
-            'name' => $data->name,
-            'email' => $data->email,
-            'password' => $this->hasher->make($data->password),
-            'device_id' => $data->deviceId,
-            'device_name' => $data->deviceName,
-            'ip_address' => $data->ipAddress,
-            'user_agent' => $data->userAgent,
-        ]);
+        $result = $this->emailVerification->storePendingRegistration();
 
         return new AuthResult(
             user: null,
@@ -76,29 +70,21 @@ class RegistrationService implements RegistrationServiceInterface
         );
     }
 
-    protected function handleStandardRegistration(RegisterData $data): AuthResult
+    protected function handleStandardRegistration(): AuthResult
     {
         $user = $this->userModel::create([
-            'name' => $data->name,
-            'email' => $data->email,
-            'password' => $this->hasher->make($data->password),
+            'name' => $this->registerData->name,
+            'email' => $this->registerData->email,
+            'password' => $this->hasher->make($this->registerData->password),
         ]);
 
-        Auth::login($user);
-
-        $tokenResult = $this->authManager->finalizeLoginFromData(
+        return $this->authenticateAndRespond(
             $user,
-            $data->deviceId,
-            $data->deviceName,
-            $data->ipAddress,
-            $data->userAgent
-        );
-
-        return new AuthResult(
-            user: $user,
-            token: $tokenResult->token ?? null,
-            message: 'Registered successfully',
-            status: 201,
+            $this->registerData->deviceId,
+            $this->registerData->deviceName,
+            $this->registerData->ipAddress,
+            $this->registerData->userAgent,
+            'Registered successfully'
         );
     }
 
@@ -116,22 +102,13 @@ class RegistrationService implements RegistrationServiceInterface
         // Only pending registration is supported if verification is required
         $result = $this->emailVerification->verifyPendingRegistration($data->email, $data->code);
 
-        $user = $result['user'];
-        Auth::login($user);
-
-        $tokenResult = $this->authManager->finalizeLoginFromData(
-            $user,
+        return $this->authenticateAndRespond(
+            $result['user'],
             $result['device_id'] ?? $data->deviceId,
             $result['device_name'] ?? $data->deviceName,
             $result['ip_address'] ?? $data->ipAddress,
-            $result['user_agent'] ?? $data->userAgent
-        );
-
-        return new AuthResult(
-            user: $user,
-            token: $tokenResult->token ?? null,
-            message: $result['message'],
-            status: 201,
+            $result['user_agent'] ?? $data->userAgent,
+            $result['message']
         );
     }
 
@@ -140,21 +117,32 @@ class RegistrationService implements RegistrationServiceInterface
         // Only pending flow is supported for registration verification
         $result = $this->emailVerification->verifyPendingLink($data->token);
 
-        $user = $result['user'];
+        return $this->authenticateAndRespond(
+            $result['user'],
+            $result['device_id'] ?? $data->deviceId,
+            $result['device_name'] ?? $data->deviceName,
+            $result['ip_address'] ?? $data->ipAddress,
+            $result['user_agent'] ?? $data->userAgent,
+            $result['message']
+        );
+    }
+
+    protected function authenticateAndRespond($user, $deviceId, $deviceName, $ipAddress, $userAgent, $message): AuthResult
+    {
         Auth::login($user);
 
         $tokenResult = $this->authManager->finalizeLoginFromData(
             $user,
-            $result['device_id'] ?? $data->deviceId,
-            $result['device_name'] ?? $data->deviceName,
-            $result['ip_address'] ?? $data->ipAddress,
-            $result['user_agent'] ?? $data->userAgent
+            $deviceId,
+            $deviceName,
+            $ipAddress,
+            $userAgent
         );
 
         return new AuthResult(
             user: $user,
             token: $tokenResult->token ?? null,
-            message: $result['message'],
+            message: $message,
             status: 201,
         );
     }

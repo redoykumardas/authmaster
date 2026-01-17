@@ -26,10 +26,10 @@ interface SecurityServiceInterface
      *
      * @throws \Redoy\AuthMaster\Exceptions\TooManyAttemptsException
      */
-    public function allowRegistrationAttempt(string $ip, ?string $deviceId = null): void;
+    public function allowRegistrationAttempt(?string $ip = null, ?string $deviceId = null): void;
 
     /**
      * Record a registration attempt.
      */
-    public function recordRegistrationAttempt(string $ip, ?string $deviceId = null): void;
+    public function recordRegistrationAttempt(?string $ip = null, ?string $deviceId = null): void;
 }

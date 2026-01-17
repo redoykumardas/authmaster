@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Redoy\AuthMaster\Contracts\PasswordServiceInterface;
+use Redoy\AuthMaster\Exceptions\AuthException;
 
 class PasswordService implements PasswordServiceInterface
 {
@@ -14,7 +15,7 @@ class PasswordService implements PasswordServiceInterface
         $status = Password::sendResetLink(['email' => $email]);
 
         if ($status !== Password::RESET_LINK_SENT) {
-            throw new \Redoy\AuthMaster\Exceptions\AuthException(trans($status), 422);
+            throw new AuthException(trans($status), 422);
         }
     }
 
@@ -30,7 +31,7 @@ class PasswordService implements PasswordServiceInterface
         );
 
         if ($status !== Password::PASSWORD_RESET) {
-            throw new \Redoy\AuthMaster\Exceptions\AuthException(trans($status), 422);
+            throw new AuthException(trans($status), 422);
         }
     }
 }

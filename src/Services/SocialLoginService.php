@@ -9,6 +9,9 @@ use Illuminate\Support\Str;
 use Redoy\AuthMaster\Contracts\DeviceSessionServiceInterface;
 use Redoy\AuthMaster\Contracts\SocialLoginServiceInterface;
 use Redoy\AuthMaster\Contracts\TokenServiceInterface;
+use Redoy\AuthMaster\Exceptions\AuthException;
+use Laravel\Socialite\Facades\Socialite;
+use Throwable;
 
 class SocialLoginService implements SocialLoginServiceInterface
 {
@@ -20,26 +23,26 @@ class SocialLoginService implements SocialLoginServiceInterface
 
     protected function socialiteAvailable(): bool
     {
-        return class_exists('\Laravel\Socialite\Facades\Socialite');
+        return class_exists('Laravel\Socialite\Facades\Socialite');
     }
 
     public function redirect(string $provider): \Illuminate\Http\RedirectResponse
     {
         $providers = config('authmaster.social_providers', []);
         if (!isset($providers[$provider]) || !$providers[$provider]['enabled']) {
-            throw new \Redoy\AuthMaster\Exceptions\AuthException('Provider disabled', 400);
+            throw new AuthException('Provider disabled', 400);
         }
 
         if (!$this->socialiteAvailable()) {
-            throw new \Redoy\AuthMaster\Exceptions\AuthException('Socialite not installed', 500);
+            throw new AuthException('Socialite not installed', 500);
         }
 
         try {
-            $redirectUrl = \Laravel\Socialite\Facades\Socialite::driver($provider)->stateless()->redirect()->getTargetUrl();
+            $redirectUrl = Socialite::driver($provider)->stateless()->redirect()->getTargetUrl();
             return redirect($redirectUrl);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('AuthMaster Social redirect error: ' . $e->getMessage());
-            throw new \Redoy\AuthMaster\Exceptions\AuthException('Failed to create social redirect', 500);
+            throw new AuthException('Failed to create social redirect', 500);
         }
     }
 
@@ -55,22 +58,22 @@ class SocialLoginService implements SocialLoginServiceInterface
     {
         $providers = config('authmaster.social_providers', []);
         if (!isset($providers[$provider]) || !$providers[$provider]['enabled']) {
-            throw new \Redoy\AuthMaster\Exceptions\AuthException('Provider disabled', 400);
+            throw new AuthException('Provider disabled', 400);
         }
 
         if (!$this->socialiteAvailable()) {
-            throw new \Redoy\AuthMaster\Exceptions\AuthException('Socialite not installed', 500);
+            throw new AuthException('Socialite not installed', 500);
         }
 
         try {
-            $socialUser = \Laravel\Socialite\Facades\Socialite::driver($provider)->stateless()->user();
-        } catch (\Throwable $e) {
+            $socialUser = Socialite::driver($provider)->stateless()->user();
+        } catch (Throwable $e) {
             Log::error('AuthMaster Social callback error: ' . $e->getMessage());
-            throw new \Redoy\AuthMaster\Exceptions\AuthException('Failed to fetch social user', 400);
+            throw new AuthException('Failed to fetch social user', 400);
         }
 
         if (empty($socialUser->getEmail())) {
-            throw new \Redoy\AuthMaster\Exceptions\AuthException('No email returned by provider', 400);
+            throw new AuthException('No email returned by provider', 400);
         }
 
         $userModel = config('auth.providers.users.model');

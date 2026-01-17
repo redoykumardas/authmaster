@@ -17,6 +17,7 @@ use Redoy\AuthMaster\Contracts\ValidationManagerInterface;
 use Redoy\AuthMaster\DTOs\AuthResult;
 use Redoy\AuthMaster\DTOs\LoginData;
 use Redoy\AuthMaster\DTOs\PasswordResetData;
+use Redoy\AuthMaster\Exceptions\AuthException;
 use Redoy\AuthMaster\Exceptions\InvalidCredentialsException;
 use Redoy\AuthMaster\Exceptions\TooManyAttemptsException;
 use Redoy\AuthMaster\Exceptions\TwoFactorRequiredException;
@@ -141,7 +142,7 @@ class AuthManager implements AuthManagerInterface
     public function changePassword($user, array $payload): AuthResult
     {
         if (!$this->hasher->check($payload['current_password'], $user->password)) {
-            throw new \Redoy\AuthMaster\Exceptions\AuthException('Current password does not match', 422);
+            throw new AuthException('Current password does not match', 422);
         }
         $user->update(['password' => $this->hasher->make($payload['password'])]);
         return new AuthResult(message: 'Password changed');

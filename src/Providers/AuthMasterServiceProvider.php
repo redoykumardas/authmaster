@@ -7,6 +7,8 @@ use Redoy\AuthMaster\Contracts;
 use Redoy\AuthMaster\Services;
 use Redoy\AuthMaster\Console;
 use Redoy\AuthMaster\Http;
+use Redoy\AuthMaster\DTOs\RegisterData;
+use Redoy\AuthMaster\Http\Requests\RegisterRequest;
 
 class AuthMasterServiceProvider extends ServiceProvider
 {
@@ -33,10 +35,21 @@ class AuthMasterServiceProvider extends ServiceProvider
         $this->app->singleton(Contracts\SecurityServiceInterface::class, Services\SecurityService::class);
         $this->app->singleton(Contracts\ValidationManagerInterface::class, Services\ValidationManager::class);
         $this->app->singleton(Contracts\TwoFactorServiceInterface::class, Services\TwoFactorService::class);
-        $this->app->singleton(Contracts\EmailVerificationServiceInterface::class, Services\EmailVerificationService::class);
         $this->app->singleton(Contracts\SocialLoginServiceInterface::class, Services\SocialLoginService::class);
         $this->app->singleton(Contracts\AuthManagerInterface::class, Services\AuthManager::class);
-        $this->app->singleton(Contracts\RegistrationServiceInterface::class, Services\RegistrationService::class);
+
+        // Bind request-scoped services
+        $this->app->bind(Contracts\EmailVerificationServiceInterface::class, Services\EmailVerificationService::class);
+        $this->app->bind(Contracts\RegistrationServiceInterface::class, Services\RegistrationService::class);
+
+        // Bind RegisterData to resolve from the current request
+        $this->app->bind(RegisterData::class, function ($app) {
+            try {
+                return RegisterData::fromRequest($app->make(RegisterRequest::class));
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                return null;
+            }
+        });
     }
 
     public function boot(): void

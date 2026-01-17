@@ -11,11 +11,10 @@ interface RegistrationServiceInterface
     /**
      * Register a new user.
      *
-     * @param RegisterData $data Registration data
      * @return AuthResult The registration result
      * @throws \Redoy\AuthMaster\Exceptions\AuthException On failure
      */
-    public function register(RegisterData $data): AuthResult;
+    public function register(): AuthResult;
 
     /**
      * Verify email address.

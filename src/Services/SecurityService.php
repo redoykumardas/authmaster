@@ -4,12 +4,19 @@ namespace Redoy\AuthMaster\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Redoy\AuthMaster\Exceptions\TooManyAttemptsException;
 use Redoy\AuthMaster\Contracts\SecurityServiceInterface;
 use Redoy\AuthMaster\Events\FailedLoginAttempt;
 use Redoy\AuthMaster\Events\SuspiciousActivityDetected;
 
 class SecurityService implements SecurityServiceInterface
 {
+    public function __construct(
+        protected Request $request
+    ) {}
+
     public function allowLoginAttempt(?string $email, string $ip, ?string $deviceId = null): void
     {
         // Check global email/IP lockout
@@ -19,7 +26,7 @@ class SecurityService implements SecurityServiceInterface
                 'ip_address' => $ip
             ], config('authmaster.security.max_login_attempts', 5), config('authmaster.security.lockout_duration_minutes', 15))
         ) {
-            throw new \Redoy\AuthMaster\Exceptions\TooManyAttemptsException('Too many login attempts. Please try again later.');
+            throw new TooManyAttemptsException('Too many login attempts. Please try again later.');
         }
 
         // Check device-specific lockout
@@ -29,7 +36,7 @@ class SecurityService implements SecurityServiceInterface
                     'device_id' => $deviceId
                 ], config('authmaster.security.max_login_attempts_per_device', 10), config('authmaster.security.device_lockout_duration_minutes', 60))
             ) {
-                throw new \Redoy\AuthMaster\Exceptions\TooManyAttemptsException('Too many login attempts from this device. Please try again later.');
+                throw new TooManyAttemptsException('Too many login attempts from this device. Please try again later.');
             }
         }
     }
@@ -55,7 +62,7 @@ class SecurityService implements SecurityServiceInterface
             return true;
         }
 
-        $lastAttemptAt = \Illuminate\Support\Carbon::parse($stats->last_at);
+        $lastAttemptAt = Carbon::parse($stats->last_at);
         $isLockedOut = $stats->total_attempts >= $max &&
             $lastAttemptAt->isAfter(now()->subMinutes($lockoutMinutes));
 
@@ -125,8 +132,11 @@ class SecurityService implements SecurityServiceInterface
         }
     }
 
-    public function allowRegistrationAttempt(string $ip, ?string $deviceId = null): void
+    public function allowRegistrationAttempt(?string $ip = null, ?string $deviceId = null): void
     {
+        $ip = $ip ?? $this->request->ip();
+        $deviceId = $deviceId ?? $this->request->header('device_id') ?? $this->request->header('X-Device-Id');
+
         $max = config('authmaster.security.max_registration_attempts_per_device', 3);
         $lockout = config('authmaster.security.device_lockout_duration_minutes', 60);
 
@@ -134,12 +144,15 @@ class SecurityService implements SecurityServiceInterface
             'ip_address' => $ip,
             'device_id' => $deviceId
         ], $max, $lockout)) {
-            throw new \Redoy\AuthMaster\Exceptions\TooManyAttemptsException('Too many registration attempts. Please try again later.');
+            throw new TooManyAttemptsException('Too many registration attempts. Please try again later.');
         }
     }
 
-    public function recordRegistrationAttempt(string $ip, ?string $deviceId = null): void
+    public function recordRegistrationAttempt(?string $ip = null, ?string $deviceId = null): void
     {
+        $ip = $ip ?? $this->request->ip();
+        $deviceId = $deviceId ?? $this->request->header('device_id') ?? $this->request->header('X-Device-Id');
+
         $this->updateAttemptCount('authmaster_registration_attempts', [
             'ip_address' => $ip,
             'device_id' => $deviceId

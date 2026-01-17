@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Cache;
 use Redoy\AuthMaster\Contracts\OtpGeneratorInterface;
 use Redoy\AuthMaster\Contracts\TwoFactorServiceInterface;
 use Redoy\AuthMaster\Jobs\SendOtpJob;
+use Redoy\AuthMaster\Exceptions\AuthException;
 
 class TwoFactorService implements TwoFactorServiceInterface
 {
@@ -47,7 +48,7 @@ class TwoFactorService implements TwoFactorServiceInterface
     {
         $delay = $this->checkResendDelay($user->id);
         if ($delay) {
-            throw new \Redoy\AuthMaster\Exceptions\AuthException("Please wait {$delay} seconds before requesting a new OTP", 429);
+            throw new AuthException("Please wait {$delay} seconds before requesting a new OTP", 429);
         }
 
         $length = config('authmaster.otp.length', 6);
@@ -83,11 +84,11 @@ class TwoFactorService implements TwoFactorServiceInterface
         $cached = Cache::get($key);
 
         if (!$cached) {
-            throw new \Redoy\AuthMaster\Exceptions\AuthException('Code expired or not found', 422);
+            throw new AuthException('Code expired or not found', 422);
         }
 
         if (!hash_equals((string) $cached, (string) $code)) {
-            throw new \Redoy\AuthMaster\Exceptions\AuthException('Invalid code', 422);
+            throw new AuthException('Invalid code', 422);
         }
 
         Cache::forget($key);
