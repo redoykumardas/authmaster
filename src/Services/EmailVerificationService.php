@@ -74,6 +74,11 @@ class EmailVerificationService implements EmailVerificationServiceInterface
     public function storePendingRegistration(array $data): array
     {
         $email = $data['email'];
+
+        if ($this->hasPendingRegistration($email)) {
+            throw new \Redoy\AuthMaster\Exceptions\AuthException('Your email is in registration process, verify otp or wait some time and try again.', 429);
+        }
+
         $ttl = config('authmaster.registration.verification_expires', 3600);
 
         $method = $this->getVerificationMethod();
@@ -246,4 +251,9 @@ class EmailVerificationService implements EmailVerificationServiceInterface
         return ['message' => 'New verification code sent'];
     }
 
+    public function hasPendingRegistration(string $email): bool
+    {
+        $key = $this->pendingRegistrationKey($email);
+        return Cache::has($key);
+    }
 }

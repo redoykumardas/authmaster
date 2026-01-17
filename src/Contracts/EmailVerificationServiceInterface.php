@@ -71,4 +71,9 @@ interface EmailVerificationServiceInterface
      */
     public function resendPendingOtp(string $email): array;
 
+    /**
+     * Check if there is an active pending registration for the email.
+     */
+    public function hasPendingRegistration(string $email): bool;
+
 }
