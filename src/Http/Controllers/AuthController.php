@@ -49,10 +49,6 @@ class AuthController extends Controller
         );
     }
 
-    public function resendVerification(Request $request)
-    {
-        return $this->registrationService->resendVerification($request->user());
-    }
 
     public function logout(Request $request)
     {

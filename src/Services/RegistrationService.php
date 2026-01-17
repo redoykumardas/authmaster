@@ -37,12 +37,12 @@ class RegistrationService implements RegistrationServiceInterface
 
         $this->securityService->recordRegistrationAttempt($data->ipAddress, $data->deviceId);
 
-        // Check if pending registration flow is enabled
-        if ($this->emailVerification->isPendingFlowEnabled()) {
+        // If verification is required, use pending registration flow (stores in cache/pending table)
+        if ($this->emailVerification->isVerificationRequired()) {
             return $this->handlePendingRegistration($data);
         }
 
-        // Standard flow: create user immediately
+        // No verification required: create user immediately
         return $this->handleStandardRegistration($data);
     }
 
@@ -84,28 +84,6 @@ class RegistrationService implements RegistrationServiceInterface
 
         Auth::login($user);
 
-        // Check if email verification is required
-        if ($this->emailVerification->isVerificationRequired()) {
-            $this->emailVerification->sendVerification($user);
-
-            $tokenResult = $this->authManager->finalizeLoginFromData(
-                $user,
-                $data->deviceId,
-                $data->deviceName,
-                $data->ipAddress,
-                $data->userAgent
-            );
-
-            return new AuthResult(
-                user: $user,
-                token: $tokenResult->token ?? null,
-                message: 'Registered. Please verify your email.',
-                emailVerificationRequired: true,
-                emailVerificationMethod: $this->emailVerification->getVerificationMethod(),
-                status: 201,
-            );
-        }
-
         $tokenResult = $this->authManager->finalizeLoginFromData(
             $user,
             $data->deviceId,
@@ -133,113 +111,58 @@ class RegistrationService implements RegistrationServiceInterface
 
     protected function verifyOtp(VerifyEmailData $data): AuthResult
     {
-        // Check pending registration first
-        if ($this->emailVerification->isPendingFlowEnabled()) {
-            $result = $this->emailVerification->verifyPendingRegistration($data->email, $data->code);
+        // Only pending registration is supported if verification is required
+        $result = $this->emailVerification->verifyPendingRegistration($data->email, $data->code);
 
-            if ($result['success']) {
-                $user = $result['user'];
-                Auth::login($user);
+        if ($result['success']) {
+            $user = $result['user'];
+            Auth::login($user);
 
-                $tokenResult = $this->authManager->finalizeLoginFromData(
-                    $user,
-                    $result['device_id'] ?? $data->deviceId,
-                    $result['device_name'] ?? $data->deviceName,
-                    $result['ip_address'] ?? $data->ipAddress,
-                    $result['user_agent'] ?? $data->userAgent
-                );
+            $tokenResult = $this->authManager->finalizeLoginFromData(
+                $user,
+                $result['device_id'] ?? $data->deviceId,
+                $result['device_name'] ?? $data->deviceName,
+                $result['ip_address'] ?? $data->ipAddress,
+                $result['user_agent'] ?? $data->userAgent
+            );
 
-                return new AuthResult(
-                    user: $user,
-                    token: $tokenResult->token ?? null,
-                    message: $result['message'],
-                    status: 201,
-                );
-            }
-
-            if ($result['message'] !== 'No pending registration found or it has expired') {
-                throw new VerificationFailedException($result['message']);
-            }
-        }
-
-        // Existing user verification
-        $user = $this->userModel::where('email', $data->email)->first();
-
-        if (!$user) {
-            throw new VerificationFailedException('No pending registration or user found for this email');
-        }
-
-        if ($this->emailVerification->isVerified($user)) {
             return new AuthResult(
                 user: $user,
-                message: 'Email is already verified',
+                token: $tokenResult->token ?? null,
+                message: $result['message'],
+                status: 201,
             );
         }
 
-        $result = $this->emailVerification->verifyOtp($user, $data->code);
-
-        if (!$result['success']) {
-            throw new VerificationFailedException($result['message']);
-        }
-
-        return new AuthResult(
-            user: $user,
-            message: $result['message'],
-        );
+        throw new VerificationFailedException($result['message']);
     }
 
     protected function verifyLink(VerifyEmailData $data): AuthResult
     {
-        // Check pending flow first
-        if ($this->emailVerification->isPendingFlowEnabled()) {
-            $result = $this->emailVerification->verifyPendingLink($data->token);
+        // Only pending flow is supported for registration verification
+        $result = $this->emailVerification->verifyPendingLink($data->token);
 
-            if ($result['success']) {
-                $user = $result['user'];
-                Auth::login($user);
+        if ($result['success']) {
+            $user = $result['user'];
+            Auth::login($user);
 
-                $tokenResult = $this->authManager->finalizeLoginFromData(
-                    $user,
-                    $result['device_id'] ?? $data->deviceId,
-                    $result['device_name'] ?? $data->deviceName,
-                    $result['ip_address'] ?? $data->ipAddress,
-                    $result['user_agent'] ?? $data->userAgent
-                );
+            $tokenResult = $this->authManager->finalizeLoginFromData(
+                $user,
+                $result['device_id'] ?? $data->deviceId,
+                $result['device_name'] ?? $data->deviceName,
+                $result['ip_address'] ?? $data->ipAddress,
+                $result['user_agent'] ?? $data->userAgent
+            );
 
-                return new AuthResult(
-                    user: $user,
-                    token: $tokenResult->token ?? null,
-                    message: $result['message'],
-                    status: 201,
-                );
-            }
+            return new AuthResult(
+                user: $user,
+                token: $tokenResult->token ?? null,
+                message: $result['message'],
+                status: 201,
+            );
         }
 
-        // Standard verification
-        $result = $this->emailVerification->verifyLink($data->token);
-
-        if (!$result['success']) {
-            throw new VerificationFailedException($result['message']);
-        }
-
-        return new AuthResult(
-            user: $result['user'] ?? null,
-            message: $result['message'],
-        );
+        throw new VerificationFailedException($result['message']);
     }
 
-    public function resendVerification($user): AuthResult
-    {
-        if ($this->emailVerification->isVerified($user)) {
-            throw new AuthException('Email already verified', 400);
-        }
-
-        $result = $this->emailVerification->sendVerification($user);
-
-        if (!$result['success']) {
-            throw new AuthException($result['message'] ?? 'Failed to send verification', 422);
-        }
-
-        return new AuthResult(message: $result['message'] ?? 'Verification sent');
-    }
 }

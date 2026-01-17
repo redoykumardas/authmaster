@@ -41,19 +41,9 @@ class EmailVerificationService implements EmailVerificationServiceInterface
         ])->save();
     }
 
-    protected function otpCacheKey($userId): string
-    {
-        return "authmaster_email_otp:{$userId}";
-    }
-
     protected function resendCooldownKey($identifier): string
     {
         return "authmaster_resend_cooldown:" . md5($identifier);
-    }
-
-    protected function tokenCacheKey(string $token): string
-    {
-        return "authmaster_email_token:{$token}";
     }
 
     protected function checkResendDelay(string $identifier): ?int
@@ -75,111 +65,6 @@ class EmailVerificationService implements EmailVerificationServiceInterface
         Cache::put($key, now()->timestamp + $delay, $delay);
     }
 
-    public function sendOtp($user): array
-    {
-        $delay = $this->checkResendDelay($user->email);
-        if ($delay) {
-            return ['success' => false, 'message' => "Please wait {$delay} seconds before requesting a new code"];
-        }
-
-        $length = config('authmaster.otp.length', 6);
-        $ttl = config('authmaster.registration.verification_expires', 3600);
-
-        $code = $this->otpGenerator->generate($length);
-        $key = $this->otpCacheKey($user->id);
-
-        Cache::put($key, $code, $ttl);
-        $this->setResendDelay($user->email);
-
-        if (config('authmaster.otp.use_queue', true)) {
-            SendOtpJob::dispatch($user, $code);
-        } else {
-            SendOtpJob::dispatchSync($user, $code);
-        }
-
-        return ['success' => true, 'message' => 'Verification OTP sent to your email'];
-    }
-
-    public function verifyOtp($user, string $code): array
-    {
-        $key = $this->otpCacheKey($user->id);
-        $cached = Cache::get($key);
-
-        if (!$cached) {
-            return ['success' => false, 'message' => 'Verification code expired or not found'];
-        }
-
-        if (!hash_equals((string) $cached, (string) $code)) {
-            return ['success' => false, 'message' => 'Invalid verification code'];
-        }
-
-        Cache::forget($key);
-        $this->markAsVerified($user);
-
-        return ['success' => true, 'message' => 'Email verified successfully'];
-    }
-
-    public function sendLink($user): array
-    {
-        $delay = $this->checkResendDelay($user->email);
-        if ($delay) {
-            return ['success' => false, 'message' => "Please wait {$delay} seconds before requesting a new link"];
-        }
-
-        $ttl = config('authmaster.registration.verification_expires', 3600);
-        $token = Str::random(64);
-
-        $key = $this->tokenCacheKey($token);
-        Cache::put($key, $user->id, $ttl);
-        $this->setResendDelay($user->email);
-
-        $baseUrl = config('authmaster.registration.verification_url', '/verify-email');
-        $verificationUrl = url($baseUrl) . '?token=' . $token;
-
-        if (config('authmaster.otp.use_queue', true)) {
-            SendVerificationLinkJob::dispatch($user, $verificationUrl);
-        } else {
-            SendVerificationLinkJob::dispatchSync($user, $verificationUrl);
-        }
-
-        return ['success' => true, 'message' => 'Verification link sent to your email'];
-    }
-
-    public function verifyLink(string $token): array
-    {
-        $key = $this->tokenCacheKey($token);
-        $userId = Cache::get($key);
-
-        if (!$userId) {
-            return ['success' => false, 'message' => 'Verification link expired or invalid'];
-        }
-
-        $user = $this->userModel::find($userId);
-
-        if (!$user) {
-            return ['success' => false, 'message' => 'User not found'];
-        }
-
-        Cache::forget($key);
-        $this->markAsVerified($user);
-
-        return ['success' => true, 'message' => 'Email verified successfully', 'user' => $user];
-    }
-
-    public function sendVerification($user): array
-    {
-        $method = $this->getVerificationMethod();
-
-        if ($method === 'otp') {
-            return $this->sendOtp($user);
-        }
-
-        if ($method === 'link') {
-            return $this->sendLink($user);
-        }
-
-        return ['success' => true, 'message' => 'No verification required'];
-    }
 
     protected function pendingRegistrationKey(string $email): string
     {
@@ -365,10 +250,4 @@ class EmailVerificationService implements EmailVerificationServiceInterface
         return ['success' => true, 'message' => 'New verification code sent'];
     }
 
-    public function isPendingFlowEnabled(): bool
-    {
-        $method = $this->getVerificationMethod();
-        return ($method === 'otp' || $method === 'link')
-            && config('authmaster.registration.verify_before_create', true);
-    }
 }

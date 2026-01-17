@@ -823,7 +823,6 @@ class RegisterTest extends AuthTestCase
         $this->app->forgetInstance(\Redoy\AuthMaster\Services\EmailVerificationService::class);
 
         config(['authmaster.registration.email_verification' => 'otp']);
-        config(['authmaster.registration.verify_before_create' => true]);
 
         $this->postJson($this->endpoint, [
             'name' => 'Pending User',
@@ -846,7 +845,6 @@ class RegisterTest extends AuthTestCase
         $this->app->forgetInstance(\Redoy\AuthMaster\Services\EmailVerificationService::class);
 
         config(['authmaster.registration.email_verification' => 'link']);
-        config(['authmaster.registration.verify_before_create' => true]);
         // Default APP_ENV in tests is usually 'testing' or 'local' but isProduction() returns false
 
         $this->postJson($this->endpoint, [
@@ -875,7 +873,6 @@ class RegisterTest extends AuthTestCase
 
         try {
             config(['authmaster.registration.email_verification' => 'link']);
-            config(['authmaster.registration.verify_before_create' => true]);
 
             $this->postJson($this->endpoint, [
                 'name' => 'Prod User',
@@ -899,7 +896,6 @@ class RegisterTest extends AuthTestCase
         $this->app->forgetInstance(\Redoy\AuthMaster\Services\EmailVerificationService::class);
 
         config(['authmaster.registration.email_verification' => 'otp']);
-        config(['authmaster.registration.verify_before_create' => true]);
 
         $this->postJson($this->endpoint, [
             'name' => 'Device User',

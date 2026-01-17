@@ -33,46 +33,6 @@ interface EmailVerificationServiceInterface
      */
     public function markAsVerified($user): void;
 
-    /**
-     * Send OTP verification to user.
-     *
-     * @param mixed $user The user instance
-     * @return array Result with success status
-     */
-    public function sendOtp($user): array;
-
-    /**
-     * Verify an OTP code.
-     *
-     * @param mixed $user The user instance
-     * @param string $code The OTP code
-     * @return array Result with success status
-     */
-    public function verifyOtp($user, string $code): array;
-
-    /**
-     * Send verification link to user.
-     *
-     * @param mixed $user The user instance
-     * @return array Result with success status
-     */
-    public function sendLink($user): array;
-
-    /**
-     * Verify a link token.
-     *
-     * @param string $token The verification token
-     * @return array Result with success status and user
-     */
-    public function verifyLink(string $token): array;
-
-    /**
-     * Send verification based on configured method.
-     *
-     * @param mixed $user The user instance
-     * @return array Result with success status
-     */
-    public function sendVerification($user): array;
 
     /**
      * Store pending registration data.
@@ -107,10 +67,4 @@ interface EmailVerificationServiceInterface
      */
     public function resendPendingOtp(string $email): array;
 
-    /**
-     * Check if pending registration flow is enabled.
-     *
-     * @return bool Whether pending flow is enabled
-     */
-    public function isPendingFlowEnabled(): bool;
 }

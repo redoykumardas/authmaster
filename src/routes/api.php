@@ -30,6 +30,5 @@ Route::prefix('auth')->group(function () {
         Route::patch('profile', [AuthController::class, 'updateProfile']);
         Route::post('password/change', [AuthController::class, 'changePassword']);
         Route::post('2fa/send', [AuthController::class, 'send2fa']);
-        Route::post('resend-verification', [AuthController::class, 'resendVerification']);
     });
 });

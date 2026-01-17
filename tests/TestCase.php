@@ -39,11 +39,8 @@ abstract class TestCase extends OrchestraTestCase
         $app['config']->set('auth.providers.users', [
             'driver' => 'eloquent',
         ]);
-        if (class_exists(\App\Models\User::class)) {
-            $app['config']->set('auth.providers.users.model', \App\Models\User::class);
-        } else {
-            $app['config']->set('auth.providers.users.model', \Illuminate\Foundation\Auth\User::class);
-        }
+        
+        $app['config']->set('auth.providers.users.model', TestUser::class);
     }
 
     protected function defineDatabaseMigrations()
@@ -75,4 +72,10 @@ abstract class TestCase extends OrchestraTestCase
     {
         parent::setUp();
     }
+}
+
+class TestUser extends \Illuminate\Foundation\Auth\User
+{
+    protected $table = 'users';
+    protected $fillable = ['name', 'email', 'password'];
 }

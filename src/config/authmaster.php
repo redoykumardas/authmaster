@@ -64,10 +64,6 @@ return [
         // Verification token/OTP expiration in seconds
         'verification_expires' => env('AUTHMASTER_VERIFICATION_EXPIRES', 3600), // 1 hour
 
-        // If true, user account is NOT created until email is verified (more secure)
-        // If false, account is created immediately and user must verify later
-        'verify_before_create' => env('AUTHMASTER_VERIFY_BEFORE_CREATE', true),
-
         // Default Token for development/testing (only used when APP_ENV != 'production')
         // Set to null to always use random Token
         'dev_token' => env('AUTHMASTER_DEV_TOKEN', 'dev-verification-token'),

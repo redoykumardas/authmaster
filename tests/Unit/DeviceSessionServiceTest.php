@@ -42,15 +42,15 @@ class DeviceSessionServiceTest extends TestCase
         config()->set('authmaster.max_devices_per_user', 1);
 
         $svc->createOrUpdateSession($user, 'a', $req, null, ['token' => 't1']);
-        // sleep to ensure different timestamps
-        usleep(10000);
+        // sleep 1 second to ensure different second-level timestamps
+        sleep(1);
         $svc->createOrUpdateSession($user, 'b', $req, null, ['token' => 't2']);
 
         $svc->enforceDeviceLimit($user);
 
-        $key = (new \ReflectionClass($svc))->getMethod('userCacheKey')->invoke($svc, $user->id);
-        $sessions = Cache::get($key, []);
+        $sessions = \Redoy\AuthMaster\Models\DeviceSession::where('user_id', $user->id)->get();
         $this->assertCount(1, $sessions);
+        $this->assertEquals('b', $sessions->first()->device_id);
     }
 
     public function test_invalidate_session_and_invalidate_all()
@@ -66,11 +66,14 @@ class DeviceSessionServiceTest extends TestCase
         $svc->createOrUpdateSession($user, 'y', $req, null, ['token' => 't2']);
 
         $svc->invalidateSession($user, 'x');
-        $key = (new \ReflectionClass($svc))->getMethod('userCacheKey')->invoke($svc, $user->id);
-        $sessions = Cache::get($key, []);
-        $this->assertArrayNotHasKey('x', $sessions);
+        $this->assertDatabaseMissing('authmaster_device_sessions', [
+            'user_id' => 7,
+            'device_id' => 'x'
+        ]);
 
         $svc->invalidateAllSessions($user);
-        $this->assertEmpty(Cache::get($key, []));
+        $this->assertDatabaseMissing('authmaster_device_sessions', [
+            'user_id' => 7
+        ]);
     }
 }

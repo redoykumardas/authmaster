@@ -59,15 +59,20 @@ class SecurityFeaturesTest extends TestCase
     /** @test */
     public function test_otp_resend_cooldown_is_enforced()
     {
-        $user = $this->createUser();
         $service = app(EmailVerificationService::class);
+        $data = [
+            'name' => 'Test',
+            'email' => 'test@example.com',
+            'password' => 'password',
+            'ip_address' => '127.0.0.1'
+        ];
 
         // First request should succeed
-        $result1 = $service->sendOtp($user);
+        $result1 = $service->storePendingRegistration($data);
         $this->assertTrue($result1['success']);
 
-        // Second immediate request should fail
-        $result2 = $service->sendOtp($user);
+        // Second immediate request (via resend) should fail
+        $result2 = $service->resendPendingOtp('test@example.com');
         $this->assertFalse($result2['success']);
         $this->assertStringContainsString('Please wait', $result2['message']);
     }
@@ -76,10 +81,15 @@ class SecurityFeaturesTest extends TestCase
     public function test_otp_is_queued_when_configured()
     {
         Bus::fake();
-        $user = $this->createUser();
         $service = app(EmailVerificationService::class);
+        $data = [
+            'name' => 'Test',
+            'email' => 'test@example.com',
+            'password' => 'password',
+            'ip_address' => '127.0.0.1'
+        ];
 
-        $service->sendOtp($user);
+        $service->storePendingRegistration($data);
 
         Bus::assertDispatched(SendOtpJob::class);
     }

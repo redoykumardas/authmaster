@@ -3,7 +3,7 @@
 namespace Redoy\AuthMaster\Tests\Unit;
 
 use Redoy\AuthMaster\Tests\TestCase;
-use Redoy\AuthMaster\AuthMasterServiceProvider;
+use Redoy\AuthMaster\Providers\AuthMasterServiceProvider;
 
 class ProviderTest extends TestCase
 {

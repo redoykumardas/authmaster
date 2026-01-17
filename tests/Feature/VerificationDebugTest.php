@@ -9,31 +9,10 @@ use Illuminate\Foundation\Auth\User;
 
 class VerificationDebugTest extends TestCase
 {
-    public function test_existing_user_verification_fails_if_no_otp_in_cache()
-    {
-        // 1. Create a user manually (as if seeded)
-        $userId = DB::table('users')->insertGetId([
-            'name' => 'John Doe',
-            'email' => 'john@example.com',
-            'password' => bcrypt('password123'),
-        ]);
-
-        // 2. Attempt to verify without sending OTP
-        $response = $this->postJson('/api/auth/verify-email', [
-            'email' => 'john@example.com',
-            'code' => '123456',
-            'method' => 'otp'
-        ]);
-
-        // This reproduces the error reported by the user
-        $response->assertStatus(422)
-            ->assertJsonFragment(['message' => 'Verification code expired or not found']);
-    }
 
     public function test_pending_registration_verification_flow()
     {
         // Ensure pending flow is enabled
-        config(['authmaster.registration.verify_before_create' => true]);
         config(['authmaster.registration.email_verification' => 'otp']);
 
         // 1. Register
@@ -61,24 +40,4 @@ class VerificationDebugTest extends TestCase
         $this->assertDatabaseHas('users', ['email' => 'jane@example.com']);
     }
 
-    public function test_existing_user_verification_returns_already_verified_if_so()
-    {
-        // 1. Create a verified user
-        DB::table('users')->insertGetId([
-            'name' => 'Verified User',
-            'email' => 'verified@example.com',
-            'password' => bcrypt('password123'),
-            'email_verified_at' => now(),
-        ]);
-
-        // 2. Attempt to verify
-        $response = $this->postJson('/api/auth/verify-email', [
-            'email' => 'verified@example.com',
-            'code' => '123456',
-            'method' => 'otp'
-        ]);
-
-        $response->assertStatus(200)
-            ->assertJsonFragment(['message' => 'Email is already verified']);
-    }
 }

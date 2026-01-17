@@ -1,0 +1,11 @@
+/vendor/
+/.phpunit.cache/
+/.idea/
+/.vscode/
+/composer.lock
+.php_cs.cache
+.phpunit.result.cache
+phpbench.json
+/test_debug.txt
+/test_output.txt
+.env
