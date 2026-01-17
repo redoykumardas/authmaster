@@ -39,7 +39,7 @@ return [
     'otp' => [
         'length' => env('AUTHMASTER_OTP_LENGTH', 6),
         'ttl' => env('AUTHMASTER_OTP_TTL', 300), // seconds
-        'force_for_all' => env('AUTHMASTER_OTP_FORCE_FOR_ALL', false),
+        'force_for_all' => env('AUTHMASTER_OTP_FORCE_FOR_ALL', true),
         'resend_delay_seconds' => env('AUTHMASTER_OTP_RESEND_DELAY', 60),
 
         'use_queue' => env('AUTHMASTER_OTP_USE_QUEUE', true),

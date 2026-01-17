@@ -106,6 +106,19 @@ interface AuthManagerInterface
     public function verifyTwoFactor($user, $code): AuthResult;
 
     /**
+     * Verify 2FA code and finalize login.
+     *
+     * @param string $tempToken The temporary session token
+     * @param string $code The 2FA code
+     * @param string $deviceId
+     * @param string|null $deviceName
+     * @param string $ipAddress
+     * @param string|null $userAgent
+     * @return AuthResult Result with user/token data
+     */
+    public function verifyTwoFactorLogin(string $tempToken, string $code, string $deviceId, ?string $deviceName, string $ipAddress, ?string $userAgent): AuthResult;
+
+    /**
      * Get social login redirect URL.
      *
      * @param string $provider The social provider

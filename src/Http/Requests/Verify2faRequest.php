@@ -15,6 +15,7 @@ class Verify2faRequest extends FormRequest
     {
         return [
             'code' => ['required', 'string'],
+            'temp_token' => ['nullable', 'string'],
         ];
     }
 

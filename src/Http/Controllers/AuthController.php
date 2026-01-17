@@ -30,9 +30,18 @@ class AuthController extends Controller
 
     public function login(LoginRequest $request)
     {
-        return $this->authManager->loginWithData(
-            LoginData::fromRequest($request)
-        );
+        try {
+            return $this->authManager->loginWithData(
+                LoginData::fromRequest($request)
+            );
+        } catch (\Redoy\AuthMaster\Exceptions\TwoFactorRequiredException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'requires_2fa' => true,
+                'temp_token' => $e->tempToken
+            ], 403);
+        }
     }
 
     public function register(RegisterRequest $request)
@@ -100,6 +109,24 @@ class AuthController extends Controller
 
     public function verify2fa(Verify2faRequest $request)
     {
+        // 1. If temp_token is present, we are completing a login
+        if ($request->filled('temp_token')) {
+            $deviceId = $request->header('device_id')
+            ?? $request->header('X-Device-Id')
+            ?? $request->header('Device-Id')
+            ?? hash('sha256', (string) $request->ip() . '|' . (string) $request->userAgent());
+            
+            return $this->authManager->verifyTwoFactorLogin(
+                $request->validated('temp_token'),
+                $request->validated('code'),
+                $deviceId,
+                $request->header('X-Device-Name') ?? $request->header('Device-Name'), // optional device name
+                $request->ip(),
+                $request->userAgent()
+            );
+        }
+
+        // 2. Otherwise, we assume the user is already authenticated (e.g. verifying for sensitive action)
         return $this->authManager->verifyTwoFactor(
             $request->user(),
             $request->validated('code')

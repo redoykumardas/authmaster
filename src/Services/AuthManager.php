@@ -5,6 +5,7 @@ namespace Redoy\AuthMaster\Services;
 use Illuminate\Contracts\Hashing\Hasher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use Redoy\AuthMaster\Contracts\AuthManagerInterface;
 use Redoy\AuthMaster\Contracts\DeviceSessionServiceInterface;
@@ -68,7 +69,9 @@ class AuthManager implements AuthManagerInterface
 
         if (config('authmaster.enable_2fa') && $this->twoFactorService->isTwoFactorRequiredFor($user)) {
             $this->twoFactorService->generateAndSend($user, $data->deviceId);
-            throw new TwoFactorRequiredException();
+            
+            $tempToken = $this->generateTempToken($user);
+            throw new TwoFactorRequiredException('Two-factor authentication required', $tempToken);
         }
 
         $this->securityService->clearFailedAttempts($user->email);
@@ -176,6 +179,49 @@ class AuthManager implements AuthManagerInterface
     {
         $this->twoFactorService->verify($user, $code);
         return new AuthResult(message: 'OTP verified');
+    }
+
+    public function verifyTwoFactorLogin(string $tempToken, string $code, string $deviceId, ?string $deviceName, string $ipAddress, ?string $userAgent): AuthResult
+    {
+        // 1. Decrypt token to find user
+        try {
+            $payload = json_decode(Crypt::decryptString($tempToken), true);
+        } catch (\Exception $e) {
+            throw new AuthException('Invalid or expired session token', 401);
+        }
+
+        if (!isset($payload['id']) || !isset($payload['expires']) || now()->timestamp > $payload['expires']) {
+            throw new AuthException('Session expired, please login again', 401);
+        }
+
+        $user = $this->userModel::find($payload['id']);
+        if (!$user) {
+            throw new AuthException('User not found', 404);
+        }
+
+        // 2. Verify OTP
+        $this->twoFactorService->verify($user, $code);
+
+        // 3. Finalize Login
+        $this->securityService->clearFailedAttempts($user->email);
+        
+        return $this->finalizeLoginFromData(
+             $user,
+             $deviceId,
+             $deviceName,
+             $ipAddress,
+             $userAgent
+        );
+    }
+
+    protected function generateTempToken($user): string
+    {
+        $payload = [
+            'id' => $user->id,
+            'expires' => now()->addMinutes(10)->timestamp,
+        ];
+        
+        return Crypt::encryptString(json_encode($payload));
     }
 
     public function socialRedirect($provider): AuthResult
