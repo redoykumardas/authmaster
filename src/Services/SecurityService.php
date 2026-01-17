@@ -49,26 +49,27 @@ class SecurityService implements SecurityServiceInterface
             }
         }
 
-        $attempt = $query->first();
+        $stats = $query->selectRaw('SUM(attempts) as total_attempts, MAX(last_attempt_at) as last_at')->first();
 
-        if (!$attempt) {
+        if (!$stats || $stats->total_attempts == 0) {
             return true;
         }
 
-        $isLockedOut = $attempt->attempts >= $max &&
-            $attempt->last_attempt_at > now()->subMinutes($lockoutMinutes);
+        $lastAttemptAt = \Illuminate\Support\Carbon::parse($stats->last_at);
+        $isLockedOut = $stats->total_attempts >= $max &&
+            $lastAttemptAt->isAfter(now()->subMinutes($lockoutMinutes));
 
         return !$isLockedOut;
     }
 
     public function recordFailedAttempt(?string $email, string $ip, ?string $deviceId = null): void
     {
-        // Update or insert record for email/IP combination
+        // Update or insert record for cell (email, ip)
         $this->updateAttemptCount('authmaster_login_attempts', ['email' => $email, 'ip_address' => $ip]);
 
-        // Update or insert record for device-only if deviceId exists
+        // Update or insert record for device-only tracking across all IPs/accounts
         if ($deviceId) {
-            $this->updateAttemptCount('authmaster_login_attempts', ['device_id' => $deviceId]);
+            $this->updateAttemptCount('authmaster_login_attempts', ['device_id' => $deviceId, 'email' => null]);
         }
 
         event(new FailedLoginAttempt($email, $ip));

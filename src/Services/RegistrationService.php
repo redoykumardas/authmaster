@@ -35,6 +35,14 @@ class RegistrationService implements RegistrationServiceInterface
 
         $this->securityService->recordRegistrationAttempt($data->ipAddress, $data->deviceId);
 
+        return $this->handleRegistration($data);
+    }
+
+    /**
+     * Determine the registration flow and handle accordingly.
+     */
+    protected function handleRegistration(RegisterData $data): AuthResult
+    {
         // If verification is required, use pending registration flow (stores in cache/pending table)
         if ($this->emailVerification->isVerificationRequired()) {
             return $this->handlePendingRegistration($data);
