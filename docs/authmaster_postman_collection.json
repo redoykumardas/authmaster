@@ -83,8 +83,9 @@
                                     "",
                                     "pm.test('Save token', function () {",
                                     "    var jsonData = pm.response.json();",
-                                    "    if (jsonData.data && jsonData.data.token && jsonData.data.token.token) {",
-                                    "        pm.collectionVariables.set('token', jsonData.data.token.token);",
+                                    "    var token = (jsonData.data && jsonData.data.token) ? (jsonData.data.token.access_token || jsonData.data.token.token) : null;",
+                                    "    if (token) {",
+                                    "        pm.collectionVariables.set('token', token);",
                                     "    }",
                                     "});"
                                 ],
@@ -140,8 +141,9 @@
                                     "",
                                     "pm.test('Save token', function () {",
                                     "    var jsonData = pm.response.json();",
-                                    "    if (jsonData.data && jsonData.data.token && jsonData.data.token.token) {",
-                                    "        pm.collectionVariables.set('token', jsonData.data.token.token);",
+                                    "    var token = (jsonData.data && jsonData.data.token) ? (jsonData.data.token.access_token || jsonData.data.token.token) : null;",
+                                    "    if (token) {",
+                                    "        pm.collectionVariables.set('token', token);",
                                     "    }",
                                     "});"
                                 ],
@@ -235,8 +237,9 @@
                                 "exec": [
                                     "pm.test('Store token', function () {",
                                     "    var jsonData = pm.response.json();",
-                                    "    if (jsonData.data && jsonData.data.token && jsonData.data.token.token) {",
-                                    "        pm.collectionVariables.set('token', jsonData.data.token.token);",
+                                    "    var token = (jsonData.data && jsonData.data.token) ? (jsonData.data.token.access_token || jsonData.data.token.token) : null;",
+                                    "    if (token) {",
+                                    "        pm.collectionVariables.set('token', token);",
                                     "    }",
                                     "});"
                                 ],
